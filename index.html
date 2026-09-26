@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ma Classe en Boîte</title>
+    <meta name="description" content="Liste d'élèves, pyramide des âges, anniversaires, groupes et cantine/garderie pour la classe.">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app" class="app" aria-label="Ma Classe en Boîte">
+
+        <header class="topbar">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">🧑‍🤝‍🧑</div>
+                <div>
+                    <h1>Ma Classe en Boîte <span class="testBadge">Version test</span></h1>
+                    <p>Liste, pyramide, anniversaires, groupes et cantine/garderie</p>
+                </div>
+            </div>
+            <div class="topActions">
+                <div class="dropdown">
+                    <button type="button" class="softButton" id="btnMenuCsv" aria-haspopup="true" aria-expanded="false">📄 Import / export CSV <span aria-hidden="true">▾</span></button>
+                    <div class="dropdownMenu" id="menuCsv" hidden>
+                        <button type="button" id="btnImportCsv">📥 Importer une liste CSV (ONDE)</button>
+                        <button type="button" id="btnExportCsv">📤 Exporter la liste en CSV</button>
+                    </div>
+                    <input type="file" id="fileImportCsv" accept=".csv" hidden>
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="softButton" id="btnMenuJson" aria-haspopup="true" aria-expanded="false">💾 Sauvegarde JSON <span aria-hidden="true">▾</span></button>
+                    <div class="dropdownMenu" id="menuJson" hidden>
+                        <button type="button" id="btnExportJson">💾 Enregistrer la classe (JSON)</button>
+                        <button type="button" id="btnImportJson">📂 Reprendre une classe (JSON)</button>
+                    </div>
+                    <input type="file" id="fileImportJson" accept=".json" hidden>
+                </div>
+                <button type="button" id="btnPrint" class="softButton">🖨️ Imprimer</button>
+                <button type="button" id="btnAide" class="softButton" aria-label="Aide et à propos" title="Aide et à propos">❓ Aide</button>
+                <button type="button" id="btnClearAll" class="softButton danger">Tout effacer</button>
+            </div>
+        </header>
+
+        <section class="card formCard" aria-label="Ajouter un élève">
+            <h2>Ajouter un élève</h2>
+            <form id="formEleve">
+                <div class="formRow">
+                    <div class="field grow">
+                        <label for="nom">Nom</label>
+                        <input type="text" id="nom" placeholder="Nom de famille (facultatif)">
+                    </div>
+                    <div class="field grow">
+                        <label for="prenom">Prénom</label>
+                        <input type="text" id="prenom" placeholder="Prénom de l'élève" required>
+                    </div>
+                    <div class="field">
+                        <label for="dateNaissance">Date de naissance</label>
+                        <input type="date" id="dateNaissance" required>
+                    </div>
+                    <div class="field">
+                        <label>Genre</label>
+                        <div class="toggleGroup" id="genreToggle" data-value="F">
+                            <button type="button" class="toggleBtn active" data-value="F">Fille</button>
+                            <button type="button" class="toggleBtn" data-value="M">Garçon</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="formRow">
+                    <div class="field">
+                        <label for="niveauSelect">Niveau de classe</label>
+                        <select id="niveauSelect" class="selectNiveau">
+                            <option value="PS">PS</option>
+                            <option value="MS">MS</option>
+                            <option value="GS">GS</option>
+                            <option value="CP" selected>CP</option>
+                            <option value="CE1">CE1</option>
+                            <option value="CE2">CE2</option>
+                            <option value="CM1">CM1</option>
+                            <option value="CM2">CM2</option>
+                            <option value="Autre">Autre…</option>
+                        </select>
+                        <input type="text" id="niveauPerso" class="levelCustom" placeholder="Nom du niveau" hidden>
+                    </div>
+                    <div class="field checks">
+                        <label class="checkLabel"><input type="checkbox" id="chkPai"> PAI</label>
+                        <label class="checkLabel"><input type="checkbox" id="chkAesh"> AESH</label>
+                    </div>
+                    <div class="field grow">
+                        <label for="paiDetail">Précisions PAI</label>
+                        <input type="text" id="paiDetail" class="levelCustom" style="max-width:none;" placeholder="Ex : allergie arachides, protocole à suivre…" hidden>
+                    </div>
+                </div>
+                <button type="submit" class="primaryButton">Ajouter l'élève <span class="arrow" aria-hidden="true">+</span></button>
+            </form>
+        </section>
+
+        <nav class="tabBar" role="tablist" aria-label="Vues disponibles">
+            <button type="button" class="tabBtn active" data-tab="liste" role="tab" aria-selected="true">📋 Liste</button>
+            <button type="button" class="tabBtn" data-tab="pyramide" role="tab" aria-selected="false">📊 Pyramide</button>
+            <button type="button" class="tabBtn" data-tab="anniversaires" role="tab" aria-selected="false">🎂 Anniversaires</button>
+            <button type="button" class="tabBtn" data-tab="groupes" role="tab" aria-selected="false">👥 Groupes</button>
+            <button type="button" class="tabBtn" data-tab="cantine" role="tab" aria-selected="false">🍽️ Cantine / Garderie</button>
+            <button type="button" class="tabBtn" data-tab="autres" role="tab" aria-selected="false">📝 Autres</button>
+            <button type="button" class="tabBtn" data-tab="apc" role="tab" aria-selected="false">🎯 Suivi APC</button>
+            <button type="button" class="tabBtn" data-tab="pointage" role="tab" aria-selected="false">🖨️ Pointage (PDF)</button>
+            <button type="button" class="tabBtn" data-tab="plan" role="tab" aria-selected="false">🗺️ Plan de classe</button>
+        </nav>
+
+        <main class="card contentCard">
+            <div class="tabPanel active" id="panel-liste"></div>
+            <div class="tabPanel" id="panel-pyramide"></div>
+            <div class="tabPanel" id="panel-anniversaires"></div>
+            <div class="tabPanel" id="panel-groupes"></div>
+            <div class="tabPanel" id="panel-cantine"></div>
+            <div class="tabPanel" id="panel-autres"></div>
+            <div class="tabPanel" id="panel-apc"></div>
+            <div class="tabPanel" id="panel-pointage"></div>
+            <div class="tabPanel" id="panel-plan"></div>
+        </main>
+
+        <footer class="appFooter">
+            Un outil de la Mission numérique 76 — développé par Etienne Liaudet
+        </footer>
+    </div>
+
+    <div id="modalRoot"></div>
+
+    <script src="scripts/app.js"></script>
+</body>
+</html>
