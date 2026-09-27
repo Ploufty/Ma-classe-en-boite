@@ -45,7 +45,8 @@
         couleursGroupes: [],
         notes: null,
         apcSeances: [],
-        pointage: Object.assign({}, POINTAGE_DEFAUT)
+        pointage: Object.assign({}, POINTAGE_DEFAUT),
+        mentionPdf: true   // pastille « Ma Classe en Boîte » en bas à droite des PDF (option dans « À propos »)
     };
 
     function nouveauGarderieJours() {
@@ -169,7 +170,8 @@
                 couleursGroupes: state.couleursGroupes,
                 notes: state.notes,
                 apcSeances: state.apcSeances,
-                pointage: state.pointage
+                pointage: state.pointage,
+                mentionPdf: state.mentionPdf
             }));
         } catch (e) {}
     }
@@ -189,6 +191,7 @@
                 if (r.notes) state.notes = r.notes;
                 if (r.apcSeances) state.apcSeances = r.apcSeances;
                 if (r.pointage) state.pointage = Object.assign({}, state.pointage, r.pointage);
+                if (r.mentionPdf === false) state.mentionPdf = false;
             }
         } catch (e) {}
         // Première utilisation : on amorce le pense-bête avec des exemples plutôt que de le laisser vide.
@@ -363,6 +366,19 @@
         }
     }
 
+    // En-tête commun des PDF : titre centré, ligne d'infos (effectif, date…), trait. « print-only » pour les onglets,
+    // visible aussi à l'écran pour l'aperçu de la feuille de pointage.
+    function enteteDoc(titre, infos, classes) {
+        return '<header class="enteteDoc' + (classes ? ' ' + classes : '') + '"><h1>' + escapeHtml(titre) + '</h1>' +
+            '<p>' + escapeHtml(infos.filter(Boolean).join(' · ')) + '</p></header>';
+    }
+
+    function effectif(n, singulier, pluriel) { return n + ' ' + (n > 1 ? pluriel : singulier); }
+
+    function enteteOnglet(titre, infos) {
+        return enteteDoc(titre, infos.concat([formatDateLongue(aujourdHuiISO())]), 'print-only');
+    }
+
     // Version imprimable (PDF) d'un onglet dont l'affichage écran est fait de champs éditables.
     function tableImpression(entetes, lignes) {
         return '<table class="tablePointage tableImpression print-only"><thead><tr>' +
@@ -450,7 +466,8 @@
         }).join('');
 
         panel.innerHTML =
-            '<div class="panelHeader"><h2 style="margin:0;">Liste de la classe</h2><span class="countBadge">' + state.eleves.length + (state.eleves.length > 1 ? ' élèves' : ' élève') + '</span></div>' +
+            enteteOnglet('Liste de la classe', [effectif(state.eleves.length, 'élève', 'élèves')]) +
+            '<div class="panelHeader no-print"><h2 style="margin:0;">Liste de la classe</h2><span class="countBadge">' + state.eleves.length + (state.eleves.length > 1 ? ' élèves' : ' élève') + '</span></div>' +
             '<div class="tableWrap no-print"><table class="listeTable"><thead><tr>' +
             '<th class="' + classeTri('nom') + '" data-sort="nom">Nom</th>' +
             '<th class="' + classeTri('prenom') + '" data-sort="prenom">Prénom</th>' +
@@ -580,6 +597,7 @@
         var totalF = state.eleves.filter(function (e) { return e.genre === 'F'; }).length;
 
         panel.innerHTML =
+            enteteOnglet('Pyramide des âges', [effectif(state.eleves.length, 'élève', 'élèves')]) +
             '<h2 class="pyraTitre">Pyramide des âges par année</h2><div class="pyraAnnees">' + lignesAnnees + '</div>' +
             '<h2 class="pyraTitre">Répartition par mois de naissance</h2><div class="pyraMoisGrille">' + barresMois + '</div>' +
             '<h2 class="pyraTitre">Répartition par niveau de classe</h2><div class="pyraMoisGrille">' + barresNiveau + '</div>' +
@@ -608,13 +626,14 @@
             var corps = liste.length
                 ? liste.map(function (e) {
                     return '<div class="annivItem"><span class="annivJour">' + e.jour + '</span><span class="annivNom">' + escapeHtml(e.nomAffiche) + '</span>' +
-                        '<span class="annivPastille" style="background:' + (e.genre === 'M' ? 'var(--bleu)' : 'var(--rouge)') + ';"></span></div>';
+                        '<span class="annivPastille" style="background:' + (e.genre === 'M' ? 'var(--bleu)' : 'var(--rouge)') + ';" title="' + (e.genre === 'M' ? 'Garçon' : 'Fille') + '">' + (e.genre === 'M' ? 'G' : 'F') + '</span></div>';
                 }).join('')
                 : '<div class="annivVide">Aucun</div>';
             return '<div class="moisCarte"><div class="moisEntete">' + NOMS_MOIS[i] + '</div><div class="moisCorps">' + corps + '</div></div>';
         }).join('');
 
-        panel.innerHTML = '<h2 style="margin-top:0;">Calendrier des anniversaires</h2><div class="calAnniv">' + cartes + '</div>';
+        panel.innerHTML = enteteOnglet('Calendrier des anniversaires', [effectif(state.eleves.length, 'élève', 'élèves')]) +
+            '<h2 class="no-print" style="margin-top:0;">Calendrier des anniversaires</h2><div class="calAnniv">' + cartes + '</div>';
     }
 
     // ---------- Vue Groupes ----------
@@ -663,6 +682,7 @@
         }).join('');
 
         panel.innerHTML =
+            enteteOnglet('Groupes', [effectif(nb, 'groupe', 'groupes'), effectif(state.eleves.length, 'élève', 'élèves')]) +
             '<div class="groupesToolbar no-print">' +
             '<span class="compteurGroupes">' + nb + (nb > 1 ? ' groupes' : ' groupe') + '</span>' +
             '<button type="button" id="btnAjouterGroupe" class="softButton"' + (nb >= MAX_GROUPES ? ' disabled' : '') + '>+ Ajouter un groupe</button>' +
@@ -836,7 +856,8 @@
                 el.aesh ? escapeHtml(resumeJours(el.aeshJours, 'après-midi')) || 'Oui' : '',
                 escapeHtml(sante), escapeHtml(el.remarque || '')];
         }));
-        panel.innerHTML = '<h2 style="margin-top:0;">Cantine et garderie</h2><div class="grilleCantine no-print">' + cartes + '</div>' + impression;
+        panel.innerHTML = enteteOnglet('Cantine et garderie', [effectif(state.eleves.length, 'élève', 'élèves')]) +
+            '<h2 class="no-print" style="margin-top:0;">Cantine et garderie</h2><div class="grilleCantine no-print">' + cartes + '</div>' + impression;
 
         panel.querySelectorAll('.champInfoCantine').forEach(function (input) {
             input.addEventListener('change', function () {
@@ -880,7 +901,8 @@
         }).join('') || '<div class="notesVide">Aucune ligne pour l\'instant. Ajoutez-en une ci-dessous.</div>';
 
         panel.innerHTML =
-            '<h2 style="margin-top:0;">📝 Informations importantes de la classe</h2>' +
+            enteteOnglet('Informations importantes de la classe', []) +
+            '<h2 class="no-print" style="margin-top:0;">📝 Informations importantes de la classe</h2>' +
             '<p class="autresIntro no-print">Notez ici vos codes ou informations diverses de la classe (une ligne par information, avec un emoji au choix pour vous repérer), à consulter ou imprimer à tout moment.</p>' +
             '<div class="boiteNotes no-print">' + lignes + '</div>' +
             '<ul class="notesImpression print-only">' + state.notes.filter(function (n) { return (n.texte || '').trim(); }).map(function (n) {
@@ -966,7 +988,8 @@
         }).join('') || '<div class="notesVide">Aucune séance enregistrée pour l\'instant.</div>';
 
         panel.innerHTML =
-            '<h2 style="margin-top:0;">Suivi des séances d\'APC</h2>' +
+            enteteOnglet('Suivi des séances d\'APC', [effectif(state.apcSeances.length, 'séance', 'séances')]) +
+            '<h2 class="no-print" style="margin-top:0;">Suivi des séances d\'APC</h2>' +
             '<form id="formApc" class="formApc no-print">' +
             '<div class="formRow">' +
             '<div class="field"><label for="apcDate">Date</label><input type="date" id="apcDate" required></div>' +
@@ -1250,9 +1273,7 @@
         var paysage = p.orientation === 'paysage';
         $('feuillePointage').className = 'feuillePointage' + (def.grille ? (paysage ? ' paysage' : ' portrait') + (paysage && lignes.length > 27 ? ' compacte' : '') : '');
         $('feuillePointage').innerHTML =
-            '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || def.titre) + '</h2>' +
-            '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
-            '<div class="sousTitreFeuille">' + escapeHtml(sousTitre) + '</div>' +
+            enteteDoc(p.titre.trim() || def.titre, [sousTitre, formatDateLongue(pointageDate)]) +
             (deuxExemplaires ? '<div class="duoPointage">' + table + table + '</div>' : table) +
             (def.grille ? '' : '<div class="piedFeuille"><span>Présents : ……… / ' + choisis.length + '</span><span>Pointage effectué par : ……………………………</span></div>');
     }
@@ -1592,7 +1613,8 @@
             couleursGroupes: state.couleursGroupes,
             notes: state.notes,
             apcSeances: state.apcSeances,
-            pointage: state.pointage
+            pointage: state.pointage,
+            mentionPdf: state.mentionPdf
         };
         telecharger(JSON.stringify(donnees, null, 2), 'application/json;charset=utf-8;', 'json');
     }
@@ -1609,6 +1631,8 @@
         state.notes = normaliserNotes(donnees.notes || EXEMPLES_NOTES.slice());
         state.apcSeances = donnees.apcSeances || [];
         state.pointage = Object.assign({}, POINTAGE_DEFAUT, donnees.pointage);
+        state.mentionPdf = donnees.mentionPdf !== false;
+        appliquerMentionPdf();
         pointageSelection = null;
         sauvegarder();
         render();
@@ -1740,12 +1764,31 @@
             '      </ul>' +
             '      <h4>🖨️ Imprimer / PDF</h4><p>Le bouton « Exporter cet onglet en PDF » (au-dessus de chaque onglet) imprime l\'onglet affiché : choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression. Le bouton « Imprimer » en haut de page permet de regrouper plusieurs sections, chacune sur une nouvelle page.</p>' +
             '      <p class="creditAide">Outil développé par <strong>Etienne Liaudet</strong> — Mission numérique 76 (DSDEN de la Seine-Maritime).</p>' +
+            '      <h4>⚙️ Options</h4>' +
+            '      <label class="checkLabel"><input type="checkbox" id="chkMentionPdf"' + (state.mentionPdf ? ' checked' : '') + '> Afficher la pastille « Ma Classe en Boîte » en bas à droite des PDF</label>' +
             '    </div>',
             'Fermer', { large: true }
         ).addEventListener('click', fermerModale);
+        $('chkMentionPdf').addEventListener('change', function () {
+            state.mentionPdf = this.checked;
+            appliquerMentionPdf();
+            sauvegarder();
+        });
     }
 
     $('btnAide').addEventListener('click', showAide);
+
+    // ---------- Pastille « Ma Classe en Boîte » sur les PDF ----------
+    // Écrite dans la marge basse de chaque page (@page @bottom-right) : présente sur toutes les pages, sans jamais
+    // chevaucher le contenu. Pris en charge par Chrome / Edge ; les autres navigateurs impriment sans la pastille.
+    var styleMentionPdf = document.createElement('style');
+    styleMentionPdf.textContent = '@page { @bottom-right { content: "Ma Classe en Boîte"; width: max-content; margin: 3.5mm 0 4mm; ' +
+        'padding: 1.5pt 7pt; border: .6pt solid #aaa; border-radius: 7pt; font: 600 7.5pt Marianne, Arial, sans-serif; color: #666; vertical-align: middle; } }';
+    document.head.appendChild(styleMentionPdf);
+
+    function appliquerMentionPdf() {
+        styleMentionPdf.disabled = !state.mentionPdf;
+    }
 
     // ---------- Effacement ----------
 
@@ -1764,5 +1807,6 @@
     // ---------- Démarrage ----------
 
     charger();
+    appliquerMentionPdf();
     render();
 })();
