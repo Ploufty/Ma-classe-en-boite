@@ -29,7 +29,9 @@
         '🧮', '🩹', '📌', '⚠️', '🔑', '💡', '📞', '🚪'
     ];
 
-    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2 };
+    // affichage : 'nomPrenom' | 'prenomNom' | 'prenom' ; tri : 'nom' | 'prenom' ; colonnesVides : null = valeur du type.
+    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2, affichage: 'nomPrenom', tri: 'nom', parNiveau: false, colonnesVides: null };
+    var MAX_COLONNES_VIDES = 8;
     var MAX_LIGNES_VIDES = 15;
 
     var state = {
@@ -980,7 +982,10 @@
         garderieMatin: { label: '🌅 Garderie du matin', titre: 'Pointage garderie du matin' },
         garderieSoir: { label: '🌇 Garderie du soir', titre: 'Pointage garderie du soir' },
         apc: { label: '🎯 APC', titre: 'Pointage APC' },
-        sortie: { label: '🚌 Sortie / appel', titre: 'Liste d\'appel' }
+        sortie: { label: '🚌 Sortie / appel', titre: 'Liste d\'appel' },
+        // Listes « grille » : N°, élève et colonnes vides à remplir à la main.
+        rapide: { label: '⚡ Liste rapide (2 exemplaires)', titre: 'Liste de la classe', grille: true, colonnesVides: 2 },
+        generale: { label: '📋 Liste générale', titre: 'Liste de la classe', grille: true, colonnesVides: 5 }
     };
     var pointageSelection = null; // ids des élèves inclus dans la feuille ; null = pas encore calculé
     var pointageDate = '';        // date de la feuille (aujourd'hui par défaut, non conservée entre deux sessions)
@@ -998,11 +1003,32 @@
         return jour ? jour.cle : null;
     }
 
-    function elevesAlphabetique() {
+    function nomPointage(el) {
+        var a = state.pointage.affichage;
+        if (a === 'prenom') return el.prenom;
+        if (a === 'prenomNom') return el.prenom + (el.nom ? ' ' + el.nom.toUpperCase() : '');
+        return nomComplet(el);
+    }
+
+    function niveauOrdre(el) { return NIVEAUX_ORDRE[el.niveau] || 99; }
+
+    // Tri des élèves selon les options du pointage : niveau d'abord (si séparé), puis ordre alphabétique choisi.
+    function elevesPourPointage() {
+        var p = state.pointage;
+        function cmp(x, y) { return (x || '').localeCompare(y || '', 'fr', { sensitivity: 'base' }); }
         return state.eleves.slice().sort(function (a, b) {
-            return (a.nom || a.prenom).localeCompare(b.nom || b.prenom, 'fr', { sensitivity: 'base' }) ||
-                a.prenom.localeCompare(b.prenom, 'fr', { sensitivity: 'base' });
+            if (p.parNiveau) {
+                var n = niveauOrdre(a) - niveauOrdre(b) || cmp(a.niveau, b.niveau);
+                if (n) return n;
+            }
+            if (p.tri === 'prenom') return cmp(a.prenom, b.prenom) || cmp(a.nom, b.nom);
+            return cmp(a.nom || a.prenom, b.nom || b.prenom) || cmp(a.prenom, b.prenom);
         });
+    }
+
+    function bornerColonnesVides(v, type) {
+        if (v === null || v === undefined || v === '') return TYPES_POINTAGE[type].colonnesVides || 0;
+        return Math.max(1, Math.min(MAX_COLONNES_VIDES, parseInt(v, 10) || 1));
     }
 
     // Élèves à inclure d'office selon le type de liste et la date.
@@ -1037,9 +1063,15 @@
 
     function colonnesPointage(type) {
         var caseCoche = { titre: 'Présent', classe: 'colCase', cellule: function () { return '<span class="caseCoche"></span>'; } };
-        var eleve = { titre: 'Élève', classe: 'colNom', cellule: function (el) { return escapeHtml(nomComplet(el)); } };
+        var eleve = { titre: state.pointage.affichage === 'prenom' ? 'Prénom' : 'Élève', classe: 'colNom', cellule: function (el) { return escapeHtml(nomPointage(el)); } };
         var vide = function (titre, classe) { return { titre: titre, classe: classe, cellule: function () { return ''; } }; };
         var remarque = { titre: 'Remarque', classe: 'colLarge', cellule: function (el) { return escapeHtml(el.remarque || ''); } };
+
+        if (TYPES_POINTAGE[type].grille) {
+            var colonnes = [{ titre: 'N°', classe: 'colNum', cellule: function (el, numero) { return numero; } }, eleve];
+            for (var k = 0; k < bornerColonnesVides(state.pointage.colonnesVides, type); k++) colonnes.push(vide('', 'colVide'));
+            return colonnes;
+        }
 
         if (type === 'cantine') {
             return [caseCoche, eleve,
@@ -1073,7 +1105,8 @@
     function rafraichirFeuillePointage() {
         var p = state.pointage;
         var type = TYPES_POINTAGE[p.type] ? p.type : 'cantine';
-        var choisis = elevesAlphabetique().filter(function (el) { return pointageSelection.indexOf(el.id) !== -1; });
+        var def = TYPES_POINTAGE[type];
+        var choisis = elevesPourPointage().filter(function (el) { return pointageSelection.indexOf(el.id) !== -1; });
         var colonnes = colonnesPointage(type);
 
         var details = [];
@@ -1085,10 +1118,16 @@
         }
         var domaine = preremplissagePointage(type, pointageDate).domaine;
         if (domaine) details.push('Domaine : ' + domaine);
-        var sousTitre = choisis.length + (choisis.length > 1 ? ' élèves attendus' : ' élève attendu') + (details.length ? ' — ' + details.join(' — ') : '');
+        var sousTitre = choisis.length + (def.grille ? (choisis.length > 1 ? ' élèves' : ' élève') : (choisis.length > 1 ? ' élèves attendus' : ' élève attendu')) + (details.length ? ' — ' + details.join(' — ') : '');
 
-        var lignes = choisis.map(function (el) {
-            return '<tr>' + colonnes.map(function (c) { return '<td class="' + c.classe + '">' + c.cellule(el) + '</td>'; }).join('') + '</tr>';
+        var effectifs = {};
+        choisis.forEach(function (el) { effectifs[el.niveau] = (effectifs[el.niveau] || 0) + 1; });
+        var lignes = [];
+        choisis.forEach(function (el, i) {
+            if (p.parNiveau && (i === 0 || choisis[i - 1].niveau !== el.niveau)) {
+                lignes.push('<tr class="ligneNiveau"><td colspan="' + colonnes.length + '">' + escapeHtml(el.niveau) + ' (' + effectifs[el.niveau] + ')</td></tr>');
+            }
+            lignes.push('<tr>' + colonnes.map(function (c) { return '<td class="' + c.classe + '">' + c.cellule(el, i + 1) + '</td>'; }).join('') + '</tr>');
         });
         var nbVides = bornerLignesVides(p.lignesVides);
         for (var i = 0; i < nbVides; i++) {
@@ -1097,13 +1136,18 @@
             }).join('') + '</tr>');
         }
 
+        // Les listes grille ont une ligne d'en-tête vierge au-dessus, pour écrire à la main le titre des colonnes.
+        var table = '<table class="tablePointage' + (def.grille ? ' tableGrille' : '') + '"><thead>' +
+            (def.grille ? '<tr class="ligneTitres">' + colonnes.map(function (c) { return '<th class="' + c.classe + '"></th>'; }).join('') + '</tr>' : '') +
+            '<tr>' + colonnes.map(function (c) { return '<th class="' + c.classe + '">' + c.titre + '</th>'; }).join('') + '</tr></thead>' +
+            '<tbody>' + lignes.join('') + '</tbody></table>';
+
         $('feuillePointage').innerHTML =
-            '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || TYPES_POINTAGE[type].titre) + '</h2>' +
+            '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || def.titre) + '</h2>' +
             '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
             '<div class="sousTitreFeuille">' + escapeHtml(sousTitre) + '</div>' +
-            '<table class="tablePointage"><thead><tr>' + colonnes.map(function (c) { return '<th class="' + c.classe + '">' + c.titre + '</th>'; }).join('') + '</tr></thead>' +
-            '<tbody>' + lignes.join('') + '</tbody></table>' +
-            '<div class="piedFeuille"><span>Présents : ……… / ' + choisis.length + '</span><span>Pointage effectué par : ……………………………</span></div>';
+            (type === 'rapide' ? '<div class="duoPointage">' + table + table + '</div>' : table) +
+            (def.grille ? '' : '<div class="piedFeuille"><span>Présents : ……… / ' + choisis.length + '</span><span>Pointage effectué par : ……………………………</span></div>');
     }
 
     function majResumeSelectionPointage() {
@@ -1111,8 +1155,8 @@
     }
 
     function rafraichirSelectionPointage() {
-        $('checklistPointage').innerHTML = elevesAlphabetique().map(function (el) {
-            return '<label class="checkLabel"><input type="checkbox" value="' + el.id + '"' + (pointageSelection.indexOf(el.id) !== -1 ? ' checked' : '') + '> ' + escapeHtml(nomComplet(el)) + '</label>';
+        $('checklistPointage').innerHTML = elevesPourPointage().map(function (el) {
+            return '<label class="checkLabel"><input type="checkbox" value="' + el.id + '"' + (pointageSelection.indexOf(el.id) !== -1 ? ' checked' : '') + '> ' + escapeHtml(nomPointage(el)) + '</label>';
         }).join('');
         majResumeSelectionPointage();
     }
@@ -1145,17 +1189,29 @@
         if (!TYPES_POINTAGE[p.type]) p.type = 'cantine';
         if (!pointageDate) pointageDate = aujourdHuiISO();
 
-        var options = Object.keys(TYPES_POINTAGE).map(function (cle) {
-            return '<option value="' + cle + '"' + (cle === p.type ? ' selected' : '') + '>' + TYPES_POINTAGE[cle].label + '</option>';
-        }).join('');
+        function options(valeurs, actuelle) {
+            return Object.keys(valeurs).map(function (cle) {
+                return '<option value="' + cle + '"' + (cle === actuelle ? ' selected' : '') + '>' + valeurs[cle] + '</option>';
+            }).join('');
+        }
+        var libellesTypes = {};
+        Object.keys(TYPES_POINTAGE).forEach(function (cle) { libellesTypes[cle] = TYPES_POINTAGE[cle].label; });
 
         panel.innerHTML =
             '<div class="pointageOutils no-print">' +
             '<div class="formRow">' +
-            '<div class="field"><label for="pointageType">Type de liste</label><select id="pointageType" class="selectNiveau">' + options + '</select></div>' +
+            '<div class="field"><label for="pointageType">Type de liste</label><select id="pointageType" class="selectNiveau">' + options(libellesTypes, p.type) + '</select></div>' +
             '<div class="field"><label for="pointageDate">Date</label><input type="date" id="pointageDate" value="' + pointageDate + '"></div>' +
             '<div class="field grow"><label for="pointageTitre">Titre (facultatif)</label><input type="text" id="pointageTitre" value="' + escapeHtml(p.titre) + '" placeholder="Ex : Sortie au musée"></div>' +
             '<div class="field"><label for="pointageVides">Lignes vides en plus</label><input type="number" id="pointageVides" min="0" max="' + MAX_LIGNES_VIDES + '" value="' + bornerLignesVides(p.lignesVides) + '"></div>' +
+            '</div>' +
+            '<div class="formRow">' +
+            '<div class="field"><label for="pointageAffichage">Affichage des noms</label><select id="pointageAffichage" class="selectNiveau">' +
+            options({ nomPrenom: 'NOM Prénom', prenomNom: 'Prénom NOM', prenom: 'Prénom seul' }, p.affichage) + '</select></div>' +
+            '<div class="field"><label for="pointageTri">Ordre alphabétique</label><select id="pointageTri" class="selectNiveau">' +
+            options({ nom: 'Par nom de famille', prenom: 'Par prénom' }, p.tri) + '</select></div>' +
+            '<div class="field checks"><label class="checkLabel"><input type="checkbox" id="pointageParNiveau"' + (p.parNiveau ? ' checked' : '') + '> Séparer par niveau</label></div>' +
+            (TYPES_POINTAGE[p.type].grille ? '<div class="field"><label for="pointageColonnes">Colonnes à remplir</label><input type="number" id="pointageColonnes" min="1" max="' + MAX_COLONNES_VIDES + '" value="' + bornerColonnesVides(p.colonnesVides, p.type) + '"></div>' : '') +
             '</div>' +
             '<div class="notePointage" id="notePointage" hidden></div>' +
             '<details class="selectionPointage" open>' +
@@ -1174,10 +1230,24 @@
         $('pointageType').addEventListener('change', function () {
             state.pointage.type = this.value;
             state.pointage.titre = '';
-            $('pointageTitre').value = '';
+            state.pointage.colonnesVides = null;
+            // Calculée avant de redessiner : le panneau remplacé peut encore émettre un « change » tardif.
+            pointageSelection = preremplissagePointage(state.pointage.type, pointageDate).ids;
             sauvegarder();
-            reinitialiserSelectionPointage();
+            renderPointage();
         });
+        function optionAffichage(id, champ, valeur) {
+            $(id).addEventListener('change', function () {
+                state.pointage[champ] = valeur(this);
+                sauvegarder();
+                rafraichirSelectionPointage();
+                rafraichirFeuillePointage();
+            });
+        }
+        optionAffichage('pointageAffichage', 'affichage', function (e) { return e.value; });
+        optionAffichage('pointageTri', 'tri', function (e) { return e.value; });
+        optionAffichage('pointageParNiveau', 'parNiveau', function (e) { return e.checked; });
+        if ($('pointageColonnes')) optionAffichage('pointageColonnes', 'colonnesVides', function (e) { return bornerColonnesVides(e.value, state.pointage.type); });
         $('pointageDate').addEventListener('change', function () {
             pointageDate = this.value || aujourdHuiISO();
             reinitialiserSelectionPointage();
@@ -1513,7 +1583,7 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
-            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel) et la date : la feuille se pré-remplit avec les élèves concernés. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +

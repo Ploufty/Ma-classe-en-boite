@@ -518,6 +518,17 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
 .tablePointage .colHeure { width: 14%; }
 .tablePointage .colMoyenne { width: 19%; }
 .tablePointage .colLarge { width: auto; }
+.tablePointage .colNum { width: 36px; text-align: center; }
+.ligneNiveau td { background: var(--bleu-pale); color: var(--bleu); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; height: 24px; border-top: 3px double var(--encre); }
+.tableGrille { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.tableGrille th, .tableGrille td { height: 24px; font-size: 12px; }
+.tableGrille td.colNum, .tableGrille td.colNom { text-align: center; }
+.tableGrille .colNom { width: 1%; white-space: nowrap; padding: 0 12px; }
+.tableGrille .ligneTitres th { height: 44px; background: transparent; }
+.tableGrille tbody tr:nth-child(even) td { background: #f2f2f2; }
+.tableGrille tbody tr.ligneNiveau td { background: var(--bleu-pale); }
+.duoPointage { display: flex; gap: 20px; align-items: flex-start; }
+.duoPointage .tablePointage { flex: 1; min-width: 0; }
 .caseCoche { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--encre); border-radius: 3px; vertical-align: middle; }
 .piedFeuille { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 30px; margin-top: 18px; font-size: 13px; font-weight: 700; color: var(--encre); }
 
@@ -576,6 +587,7 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
     .feuillePointage { border: none; box-shadow: none; padding: 0; overflow: visible; }
     .tablePointage th { background: transparent; color: #000; border-color: #000; }
     .tablePointage td { border-color: #000; }
+    .tableGrille tr:not(.ligneTitres) th, .ligneNiveau td { background: #e6e6e6; color: #000; }
     .tabPanel { display: none !important; }
     .tabPanel.active { display: block !important; }
     .impressionCiblee .tabPanel.active:not(.a-imprimer) { display: none !important; }
