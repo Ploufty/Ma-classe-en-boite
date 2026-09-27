@@ -527,6 +527,10 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
 .tableGrille .ligneTitres th { height: 44px; background: transparent; }
 .tableGrille tbody tr:nth-child(even) td { background: #f2f2f2; }
 .tableGrille tbody tr.ligneNiveau td { background: var(--bleu-pale); }
+.feuillePointage.portrait { max-width: 794px; }
+.feuillePointage.paysage { max-width: 1123px; }
+@page portrait { size: A4 portrait; }
+@page paysage { size: A4 landscape; }
 .duoPointage { display: flex; gap: 20px; align-items: flex-start; }
 .duoPointage .tablePointage { flex: 1; min-width: 0; }
 .caseCoche { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--encre); border-radius: 3px; vertical-align: middle; }
@@ -585,6 +589,8 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
     .app { max-width: 100%; gap: 0; }
     .card.contentCard { box-shadow: none; border: none; padding: 0; }
     .feuillePointage { border: none; box-shadow: none; padding: 0; overflow: visible; }
+    .feuillePointage.portrait { page: portrait; max-width: none; }
+    .feuillePointage.paysage { page: paysage; max-width: none; }
     .tablePointage th { background: transparent; color: #000; border-color: #000; }
     .tablePointage td { border-color: #000; }
     .tableGrille tr:not(.ligneTitres) th, .ligneNiveau td { background: #e6e6e6; color: #000; }

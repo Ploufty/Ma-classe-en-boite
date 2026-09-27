@@ -30,7 +30,7 @@
     ];
 
     // affichage : 'nomPrenom' | 'prenomNom' | 'prenom' ; tri : 'nom' | 'prenom' ; colonnesVides : null = valeur du type.
-    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2, affichage: 'nomPrenom', tri: 'nom', parNiveau: false, colonnesVides: null };
+    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2, affichage: 'nomPrenom', tri: 'nom', parNiveau: false, colonnesVides: null, orientation: 'portrait' };
     var MAX_COLONNES_VIDES = 8;
     var MAX_LIGNES_VIDES = 15;
 
@@ -1142,6 +1142,8 @@
             '<tr>' + colonnes.map(function (c) { return '<th class="' + c.classe + '">' + c.titre + '</th>'; }).join('') + '</tr></thead>' +
             '<tbody>' + lignes.join('') + '</tbody></table>';
 
+        // Orientation d'impression (listes rapide / générale) : appliquée via des pages nommées en CSS (@page portrait / paysage).
+        $('feuillePointage').className = 'feuillePointage' + (def.grille ? ' ' + (p.orientation === 'paysage' ? 'paysage' : 'portrait') : '');
         $('feuillePointage').innerHTML =
             '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || def.titre) + '</h2>' +
             '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
@@ -1211,7 +1213,9 @@
             '<div class="field"><label for="pointageTri">Ordre alphabétique</label><select id="pointageTri" class="selectNiveau">' +
             options({ nom: 'Par nom de famille', prenom: 'Par prénom' }, p.tri) + '</select></div>' +
             '<div class="field checks"><label class="checkLabel"><input type="checkbox" id="pointageParNiveau"' + (p.parNiveau ? ' checked' : '') + '> Séparer par niveau</label></div>' +
-            (TYPES_POINTAGE[p.type].grille ? '<div class="field"><label for="pointageColonnes">Colonnes à remplir</label><input type="number" id="pointageColonnes" min="1" max="' + MAX_COLONNES_VIDES + '" value="' + bornerColonnesVides(p.colonnesVides, p.type) + '"></div>' : '') +
+            (TYPES_POINTAGE[p.type].grille ? '<div class="field"><label for="pointageColonnes">Colonnes à remplir</label><input type="number" id="pointageColonnes" min="1" max="' + MAX_COLONNES_VIDES + '" value="' + bornerColonnesVides(p.colonnesVides, p.type) + '"></div>' +
+                '<div class="field"><label for="pointageOrientation">Orientation</label><select id="pointageOrientation" class="selectNiveau">' +
+                options({ portrait: 'Portrait', paysage: 'Paysage' }, p.orientation) + '</select></div>' : '') +
             '</div>' +
             '<div class="notePointage" id="notePointage" hidden></div>' +
             '<details class="selectionPointage" open>' +
@@ -1247,7 +1251,10 @@
         optionAffichage('pointageAffichage', 'affichage', function (e) { return e.value; });
         optionAffichage('pointageTri', 'tri', function (e) { return e.value; });
         optionAffichage('pointageParNiveau', 'parNiveau', function (e) { return e.checked; });
-        if ($('pointageColonnes')) optionAffichage('pointageColonnes', 'colonnesVides', function (e) { return bornerColonnesVides(e.value, state.pointage.type); });
+        if ($('pointageColonnes')) {
+            optionAffichage('pointageColonnes', 'colonnesVides', function (e) { return bornerColonnesVides(e.value, state.pointage.type); });
+            optionAffichage('pointageOrientation', 'orientation', function (e) { return e.value; });
+        }
         $('pointageDate').addEventListener('change', function () {
             pointageDate = this.value || aujourdHuiISO();
             reinitialiserSelectionPointage();
@@ -1420,11 +1427,14 @@
         if (!fichier) return;
         var lecteur = new FileReader();
         lecteur.onload = function (evt) {
-            var ajouts = importerCSV(evt.target.result);
+            // Un CSV enregistré par Excel est souvent en Windows-1252 : on le relit ainsi si l'UTF-8 échoue (accents).
+            var texte = new TextDecoder('utf-8').decode(evt.target.result);
+            if (texte.indexOf('\uFFFD') !== -1) texte = new TextDecoder('windows-1252').decode(evt.target.result);
+            var ajouts = importerCSV(texte);
             $('fileImportCsv').value = '';
             if (ajouts > 0) { sauvegarder(); render(); }
         };
-        lecteur.readAsText(fichier, 'UTF-8');
+        lecteur.readAsArrayBuffer(fichier);
     });
 
     // ---------- Export / import JSON (sauvegarde complète, sans perte) ----------
@@ -1583,7 +1593,7 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
-            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +
