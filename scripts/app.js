@@ -1009,7 +1009,7 @@
         });
     }
 
-    // ---------- Vue Pointage (PDF) ----------
+    // ---------- Vue Pointage / exportation PDF ----------
     // Feuille de pointage pour une date précise : la sélection des élèves est pré-remplie depuis
     // les onglets Cantine / Garderie / Suivi APC, ajustable à la main, puis imprimée (ou enregistrée
     // en PDF depuis la fenêtre d'impression du navigateur).
@@ -1649,7 +1649,7 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
-            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie matin et soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🖨️ Pointage / exportation PDF</h4><p>Choisissez le type de liste (cantine, garderie matin et soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +
