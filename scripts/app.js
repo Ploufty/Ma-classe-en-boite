@@ -29,6 +29,9 @@
         '🧮', '🩹', '📌', '⚠️', '🔑', '💡', '📞', '🚪'
     ];
 
+    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2 };
+    var MAX_LIGNES_VIDES = 15;
+
     var state = {
         eleves: [],
         activeTab: 'liste',
@@ -38,13 +41,37 @@
         couleursGroupes: [],
         notes: null,
         apcSeances: [],
-        pointage: { type: 'cantine', titre: '', lignesVides: 2 }
+        pointage: Object.assign({}, POINTAGE_DEFAUT)
     };
 
     function nouveauGarderieJours() {
         var j = {};
         JOURS_SEMAINE.forEach(function (jour) { j[jour.cle] = { matin: false, apresmidi: false }; });
         return j;
+    }
+
+    function nouvelEleve(champs) {
+        return Object.assign({
+            id: uid(), nom: '', prenom: '', dateNaissance: '', genre: 'F', niveau: 'CP',
+            pai: false, paiDetail: '', aesh: false, aeshJours: nouveauGarderieJours(),
+            groupe: null,
+            cantine: false, cantineSansViande: false, cantineSansPorc: false,
+            allergie: '', remarque: '',
+            garderie: false, garderieJours: nouveauGarderieJours()
+        }, champs);
+    }
+
+    function trouverEleve(id) {
+        return state.eleves.find(function (e) { return e.id === id; });
+    }
+
+    // Compatibilité : d'anciennes notes enregistrées comme simples chaînes deviennent des objets {emoji, texte}.
+    function normaliserNotes(notes) {
+        return notes.map(function (n) { return typeof n === 'string' ? { emoji: '', texte: n } : n; });
+    }
+
+    function bornerLignesVides(v) {
+        return Math.max(0, Math.min(MAX_LIGNES_VIDES, parseInt(v, 10) || 0));
     }
 
     function nomGroupe(i) { return state.nomsGroupes[i] || ('Groupe ' + (i + 1)); }
@@ -70,6 +97,22 @@
 
     function nomComplet(el) {
         return el.nom ? el.nom.toUpperCase() + ' ' + el.prenom : el.prenom;
+    }
+
+    function aujourdHuiISO() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function telecharger(contenu, type, extension) {
+        var url = URL.createObjectURL(new Blob([contenu], { type: type }));
+        var lien = document.createElement('a');
+        lien.href = url;
+        lien.download = 'classe_' + new Date().toISOString().slice(0, 10) + '.' + extension;
+        document.body.appendChild(lien);
+        lien.click();
+        document.body.removeChild(lien);
+        URL.revokeObjectURL(url);
     }
 
     function formatDateFR(iso) {
@@ -145,11 +188,7 @@
             }
         } catch (e) {}
         // Première utilisation : on amorce le pense-bête avec des exemples plutôt que de le laisser vide.
-        if (!state.notes) state.notes = EXEMPLES_NOTES.slice();
-        // Compatibilité : d'anciennes notes enregistrées comme simples chaînes deviennent des objets {emoji, texte}.
-        state.notes = state.notes.map(function (n) {
-            return typeof n === 'string' ? { emoji: '', texte: n } : n;
-        });
+        state.notes = normaliserNotes(state.notes || EXEMPLES_NOTES.slice());
     }
 
     // ---------- Modale (confirmation / saisie) ----------
@@ -162,50 +201,45 @@
         if (dernierFocus && typeof dernierFocus.focus === 'function') dernierFocus.focus();
     }
 
-    function showConfirm(titre, message, onOui, options) {
+    // Ouvre une modale : contenu HTML + boutons d'action. Sans libelleAnnuler, pas de bouton Annuler.
+    function ouvrirModale(contenu, libelleConfirmer, options) {
         options = options || {};
         dernierFocus = document.activeElement;
         modalRoot.innerHTML =
             '<div class="modaleOverlay" id="overlayModale">' +
-            '  <div class="modaleBox" role="dialog" aria-modal="true">' +
-            '    <h3>' + escapeHtml(titre) + '</h3>' +
-            '    <p>' + escapeHtml(message) + '</p>' +
+            '  <div class="modaleBox' + (options.large ? ' large' : '') + '" role="dialog" aria-modal="true">' +
+            contenu +
             '    <div class="modaleActions">' +
-            '      <button type="button" class="btnAnnuler" id="btnModaleAnnuler">Annuler</button>' +
-            '      <button type="button" class="btnConfirmer' + (options.bleu ? ' bleu' : '') + '" id="btnModaleConfirmer">' + escapeHtml(options.libelleConfirmer || 'Confirmer') + '</button>' +
+            (options.libelleAnnuler ? '      <button type="button" class="btnAnnuler" id="btnModaleAnnuler">' + options.libelleAnnuler + '</button>' : '') +
+            '      <button type="button" class="btnConfirmer' + (options.rouge ? '' : ' bleu') + '" id="btnModaleConfirmer">' + escapeHtml(libelleConfirmer) + '</button>' +
             '    </div>' +
             '  </div>' +
             '</div>';
-        $('btnModaleConfirmer').addEventListener('click', function () { fermerModale(); onOui(); });
-        $('btnModaleAnnuler').addEventListener('click', fermerModale);
+        if (options.libelleAnnuler) $('btnModaleAnnuler').addEventListener('click', fermerModale);
         $('overlayModale').addEventListener('click', function (e) { if (e.target.id === 'overlayModale') fermerModale(); });
         $('btnModaleConfirmer').focus();
+        return $('btnModaleConfirmer');
+    }
+
+    function showConfirm(titre, message, onOui, options) {
+        options = options || {};
+        ouvrirModale('<h3>' + escapeHtml(titre) + '</h3><p>' + escapeHtml(message) + '</p>',
+            options.libelleConfirmer || 'Confirmer', { libelleAnnuler: 'Annuler', rouge: !options.bleu })
+            .addEventListener('click', function () { fermerModale(); onOui(); });
     }
 
     function showPrompt(titre, message, valeurDefaut, onValider) {
-        dernierFocus = document.activeElement;
-        modalRoot.innerHTML =
-            '<div class="modaleOverlay" id="overlayModale">' +
-            '  <div class="modaleBox" role="dialog" aria-modal="true">' +
-            '    <h3>' + escapeHtml(titre) + '</h3>' +
-            '    <p>' + escapeHtml(message) + '</p>' +
-            '    <input type="text" id="inputModale" value="' + escapeHtml(valeurDefaut || '') + '">' +
-            '    <div class="modaleActions">' +
-            '      <button type="button" class="btnAnnuler" id="btnModaleAnnuler">Annuler</button>' +
-            '      <button type="button" class="btnConfirmer bleu" id="btnModaleConfirmer">Valider</button>' +
-            '    </div>' +
-            '  </div>' +
-            '</div>';
+        var btn = ouvrirModale('<h3>' + escapeHtml(titre) + '</h3><p>' + escapeHtml(message) + '</p>' +
+            '<input type="text" id="inputModale" value="' + escapeHtml(valeurDefaut || '') + '">',
+            'Valider', { libelleAnnuler: 'Annuler' });
         var input = $('inputModale');
         function valider() {
             var v = input.value.trim();
             fermerModale();
             if (v) onValider(v);
         }
-        $('btnModaleConfirmer').addEventListener('click', valider);
-        $('btnModaleAnnuler').addEventListener('click', fermerModale);
-        input.addEventListener('keydown', function (e) { if (e.key === 'Enter') valider(); if (e.key === 'Escape') fermerModale(); });
-        $('overlayModale').addEventListener('click', function (e) { if (e.target.id === 'overlayModale') fermerModale(); });
+        btn.addEventListener('click', valider);
+        input.addEventListener('keydown', function (e) { if (e.key === 'Enter') valider(); });
         input.focus();
         input.select();
     }
@@ -263,18 +297,11 @@
             var perso = $('niveauPerso').value.trim();
             niveau = perso || 'Autre';
         }
-        var pai = $('chkPai').checked;
-        var aesh = $('chkAesh').checked;
-        var paiDetail = $('paiDetail').value.trim();
 
-        state.eleves.push({
-            id: uid(), nom: nom, prenom: prenom, dateNaissance: dateNaissance, genre: genre, niveau: niveau,
-            pai: pai, paiDetail: paiDetail, aesh: aesh, aeshJours: nouveauGarderieJours(),
-            groupe: null,
-            cantine: false, cantineSansViande: false, cantineSansPorc: false,
-            allergie: '', remarque: '',
-            garderie: false, garderieJours: nouveauGarderieJours()
-        });
+        state.eleves.push(nouvelEleve({
+            nom: nom, prenom: prenom, dateNaissance: dateNaissance, genre: genre, niveau: niveau,
+            pai: $('chkPai').checked, paiDetail: $('paiDetail').value.trim(), aesh: $('chkAesh').checked
+        }));
         sauvegarder();
 
         $('nom').value = '';
@@ -360,7 +387,7 @@
     }
 
     function optionsNiveaux(niveauActuel) {
-        var niveaux = ['PS', 'MS', 'GS', 'CP', 'CE1', 'CE2', 'CM1', 'CM2'];
+        var niveaux = Object.keys(NIVEAUX_ORDRE);
         if (niveaux.indexOf(niveauActuel) === -1 && niveauActuel !== 'Autre') niveaux.push(niveauActuel);
         return niveaux.map(function (n) {
             return '<option value="' + escapeHtml(n) + '"' + (n === niveauActuel ? ' selected' : '') + '>' + escapeHtml(n) + '</option>';
@@ -418,8 +445,8 @@
 
         panel.querySelectorAll('.editInput, .editSelect').forEach(function (el) {
             el.addEventListener('change', function () {
-                var id = el.dataset.id, champ = el.dataset.field;
-                var eleve = state.eleves.find(function (e) { return e.id === id; });
+                var champ = el.dataset.field;
+                var eleve = trouverEleve(el.dataset.id);
                 if (!eleve) return;
                 if (champ === 'niveau' && el.value === '__autre__') {
                     showPrompt('Niveau personnalisé', 'Entrez le nom du niveau :', '', function (v) {
@@ -437,7 +464,7 @@
 
         panel.querySelectorAll('input[type="checkbox"][data-field]').forEach(function (cb) {
             cb.addEventListener('change', function () {
-                var eleve = state.eleves.find(function (e) { return e.id === cb.dataset.id; });
+                var eleve = trouverEleve(cb.dataset.id);
                 if (!eleve) return;
                 eleve[cb.dataset.field] = cb.checked;
                 sauvegarder();
@@ -449,7 +476,7 @@
             grp.addEventListener('click', function (e) {
                 var btn = e.target.closest('.genreBtn');
                 if (!btn) return;
-                var eleve = state.eleves.find(function (el) { return el.id === grp.dataset.id; });
+                var eleve = trouverEleve(grp.dataset.id);
                 if (!eleve) return;
                 eleve.genre = btn.dataset.genre;
                 sauvegarder();
@@ -459,7 +486,7 @@
 
         panel.querySelectorAll('.btnSupprimer').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var eleve = state.eleves.find(function (e) { return e.id === btn.dataset.id; });
+                var eleve = trouverEleve(btn.dataset.id);
                 if (!eleve) return;
                 showConfirm('Supprimer l\'élève', 'Voulez-vous vraiment supprimer ' + eleve.prenom + ' ?', function () {
                     state.eleves = state.eleves.filter(function (e) { return e.id !== eleve.id; });
@@ -502,27 +529,22 @@
                 '</div>';
         }).join('');
 
-        var maxMois = Math.max.apply(null, parMois.map(function (d) { return Math.max(d.M, d.F); }).concat([1]));
-        var barresMois = parMois.map(function (d, i) {
-            var hM = (d.M / maxMois) * 100, hF = (d.F / maxMois) * 100;
-            return '<div class="pyraMoisBarre">' +
-                '<div class="pyraMoisConteneur">' +
-                '<div class="barreG" style="height:' + hM + '%;" title="' + NOMS_MOIS[i] + ' : ' + d.M + ' garçon(s)"></div>' +
-                '<div class="barreF" style="height:' + hF + '%;" title="' + NOMS_MOIS[i] + ' : ' + d.F + ' fille(s)"></div>' +
-                '</div><div class="pyraMoisLabel">' + NOMS_MOIS_COURT[i] + '</div></div>';
-        }).join('');
+        // Histogramme garçons/filles : series[i] = { M, F }, titres[i] pour l'infobulle, labels[i] sous la barre.
+        function barresVerticales(series, titres, labels, styleBarre) {
+            var max = Math.max.apply(null, series.map(function (d) { return Math.max(d.M, d.F); }).concat([1]));
+            return series.map(function (d, i) {
+                return '<div class="pyraMoisBarre">' +
+                    '<div class="pyraMoisConteneur">' +
+                    '<div class="barreG" style="height:' + (d.M / max) * 100 + '%;' + styleBarre + '" title="' + titres[i] + ' : ' + d.M + ' garçon(s)"></div>' +
+                    '<div class="barreF" style="height:' + (d.F / max) * 100 + '%;' + styleBarre + '" title="' + titres[i] + ' : ' + d.F + ' fille(s)"></div>' +
+                    '</div><div class="pyraMoisLabel">' + labels[i] + '</div></div>';
+            }).join('');
+        }
+
+        var barresMois = barresVerticales(parMois, NOMS_MOIS, NOMS_MOIS_COURT, '');
 
         var niveaux = Object.keys(parNiveau).sort(function (a, b) { return (NIVEAUX_ORDRE[a] || 99) - (NIVEAUX_ORDRE[b] || 99); });
-        var maxNiveau = Math.max.apply(null, niveaux.map(function (n) { return Math.max(parNiveau[n].M, parNiveau[n].F); }).concat([1]));
-        var barresNiveau = niveaux.map(function (n) {
-            var d = parNiveau[n];
-            var hM = (d.M / maxNiveau) * 100, hF = (d.F / maxNiveau) * 100;
-            return '<div class="pyraMoisBarre">' +
-                '<div class="pyraMoisConteneur">' +
-                '<div class="barreG" style="height:' + hM + '%; width:18px;" title="' + n + ' : ' + d.M + ' garçon(s)"></div>' +
-                '<div class="barreF" style="height:' + hF + '%; width:18px;" title="' + n + ' : ' + d.F + ' fille(s)"></div>' +
-                '</div><div class="pyraMoisLabel">' + n + '</div></div>';
-        }).join('');
+        var barresNiveau = barresVerticales(niveaux.map(function (n) { return parNiveau[n]; }), niveaux, niveaux, ' width:18px;');
 
         var totalG = state.eleves.filter(function (e) { return e.genre === 'M'; }).length;
         var totalF = state.eleves.filter(function (e) { return e.genre === 'F'; }).length;
@@ -626,9 +648,7 @@
             renderGroupes();
         });
 
-        $('btnRegenererGroupes').addEventListener('click', function () {
-            genererGroupesEquilibres();
-        });
+        $('btnRegenererGroupes').addEventListener('click', genererGroupesEquilibres);
 
         panel.querySelectorAll('.btnRenommerGroupe').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -682,14 +702,11 @@
                 btn.parentElement.appendChild(popover);
             });
         });
-        document.addEventListener('click', function fermerPopoverCouleur() {
-            document.querySelectorAll('.popoverCouleurs').forEach(function (p) { p.remove(); });
-        }, { once: true });
 
         panel.querySelectorAll('.btnRetirer').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                var eleve = state.eleves.find(function (el) { return el.id === btn.dataset.id; });
+                var eleve = trouverEleve(btn.dataset.id);
                 if (eleve) { eleve.groupe = null; sauvegarder(); renderGroupes(); }
             });
         });
@@ -711,7 +728,7 @@
                 e.preventDefault();
                 zone.classList.remove('dragOver');
                 var id = dragEleveId || e.dataTransfer.getData('text/plain');
-                var eleve = state.eleves.find(function (el) { return el.id === id; });
+                var eleve = trouverEleve(id);
                 if (!eleve) return;
                 var g = parseInt(zone.dataset.groupe, 10);
                 eleve.groupe = g === 0 ? null : g;
@@ -744,13 +761,12 @@
         function grilleJours(el, champ) {
             var jours = el[champ] || nouveauGarderieJours();
             var enTete = '<tr><th></th>' + JOURS_SEMAINE.map(function (j) { return '<th>' + j.label + '</th>'; }).join('') + '</tr>';
-            var ligneMatin = '<tr><td>Matin</td>' + JOURS_SEMAINE.map(function (j) {
-                return '<td><input type="checkbox" data-id="' + el.id + '" data-champ="' + champ + '" data-jour="' + j.cle + '" data-periode="matin"' + (jours[j.cle].matin ? ' checked' : '') + '></td>';
-            }).join('') + '</tr>';
-            var ligneAprem = '<tr><td>Après-midi</td>' + JOURS_SEMAINE.map(function (j) {
-                return '<td><input type="checkbox" data-id="' + el.id + '" data-champ="' + champ + '" data-jour="' + j.cle + '" data-periode="apresmidi"' + (jours[j.cle].apresmidi ? ' checked' : '') + '></td>';
-            }).join('') + '</tr>';
-            return '<table class="grilleGarderie">' + enTete + ligneMatin + ligneAprem + '</table>';
+            function ligne(libelle, periode) {
+                return '<tr><td>' + libelle + '</td>' + JOURS_SEMAINE.map(function (j) {
+                    return '<td><input type="checkbox" data-id="' + el.id + '" data-champ="' + champ + '" data-jour="' + j.cle + '" data-periode="' + periode + '"' + (jours[j.cle][periode] ? ' checked' : '') + '></td>';
+                }).join('') + '</tr>';
+            }
+            return '<table class="grilleGarderie">' + enTete + ligne('Matin', 'matin') + ligne('Après-midi', 'apresmidi') + '</table>';
         }
 
         var cartes = elevesTries().map(function (el) {
@@ -786,14 +802,14 @@
 
         panel.querySelectorAll('.champInfoCantine').forEach(function (input) {
             input.addEventListener('change', function () {
-                var eleve = state.eleves.find(function (e) { return e.id === input.dataset.id; });
+                var eleve = trouverEleve(input.dataset.id);
                 if (eleve) { eleve[input.dataset.field] = input.value; sauvegarder(); }
             });
         });
 
         panel.querySelectorAll('input[type="checkbox"][data-field]').forEach(function (cb) {
             cb.addEventListener('change', function () {
-                var eleve = state.eleves.find(function (e) { return e.id === cb.dataset.id; });
+                var eleve = trouverEleve(cb.dataset.id);
                 if (!eleve) return;
                 eleve[cb.dataset.field] = cb.checked;
                 sauvegarder();
@@ -803,7 +819,7 @@
 
         panel.querySelectorAll('input[type="checkbox"][data-jour]').forEach(function (cb) {
             cb.addEventListener('change', function () {
-                var eleve = state.eleves.find(function (e) { return e.id === cb.dataset.id; });
+                var eleve = trouverEleve(cb.dataset.id);
                 if (!eleve) return;
                 var champ = cb.dataset.champ;
                 if (!eleve[champ]) eleve[champ] = nouveauGarderieJours();
@@ -870,9 +886,6 @@
                 btn.parentElement.appendChild(popover);
             });
         });
-        document.addEventListener('click', function fermerPopoverEmoji() {
-            document.querySelectorAll('.popoverEmojis').forEach(function (p) { p.remove(); });
-        }, { once: true });
 
         $('btnAjouterNote').addEventListener('click', function () {
             state.notes.push({ emoji: '', texte: '' });
@@ -899,7 +912,7 @@
         var seances = state.apcSeances.slice().sort(function (a, b) { return b.date.localeCompare(a.date); });
         var listeHtml = seances.map(function (s) {
             var noms = s.eleveIds.map(function (id) {
-                var el = state.eleves.find(function (e) { return e.id === id; });
+                var el = trouverEleve(id);
                 return el ? nomComplet(el) : null;
             }).filter(Boolean);
             return '<div class="carteApc">' +
@@ -928,8 +941,7 @@
             '</form>' +
             '<div class="listeSeancesApc">' + listeHtml + '</div>';
 
-        var aujourdHui = new Date();
-        $('apcDate').value = aujourdHui.getFullYear() + '-' + String(aujourdHui.getMonth() + 1).padStart(2, '0') + '-' + String(aujourdHui.getDate()).padStart(2, '0');
+        $('apcDate').value = aujourdHuiISO();
 
         $('formApc').addEventListener('submit', function (e) {
             e.preventDefault();
@@ -972,11 +984,6 @@
     };
     var pointageSelection = null; // ids des élèves inclus dans la feuille ; null = pas encore calculé
     var pointageDate = '';        // date de la feuille (aujourd'hui par défaut, non conservée entre deux sessions)
-
-    function aujourdHuiISO() {
-        var d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    }
 
     function formatDateLongue(iso) {
         var d = dateVersObjet(iso);
@@ -1083,7 +1090,7 @@
         var lignes = choisis.map(function (el) {
             return '<tr>' + colonnes.map(function (c) { return '<td class="' + c.classe + '">' + c.cellule(el) + '</td>'; }).join('') + '</tr>';
         });
-        var nbVides = Math.max(0, Math.min(15, parseInt(p.lignesVides, 10) || 0));
+        var nbVides = bornerLignesVides(p.lignesVides);
         for (var i = 0; i < nbVides; i++) {
             lignes.push('<tr>' + colonnes.map(function (c) {
                 return '<td class="' + c.classe + '">' + (c.classe === 'colCase' ? '<span class="caseCoche"></span>' : '') + '</td>';
@@ -1116,12 +1123,16 @@
         $('notePointage').hidden = !note;
     }
 
-    // Remet la sélection sur le pré-remplissage du type et de la date courants.
-    function reinitialiserSelectionPointage() {
-        pointageSelection = preremplissagePointage(state.pointage.type, pointageDate).ids;
+    function rafraichirPointage() {
         afficherNotePointage();
         rafraichirSelectionPointage();
         rafraichirFeuillePointage();
+    }
+
+    // Remet la sélection sur le pré-remplissage du type et de la date courants.
+    function reinitialiserSelectionPointage() {
+        pointageSelection = preremplissagePointage(state.pointage.type, pointageDate).ids;
+        rafraichirPointage();
     }
 
     function renderPointage() {
@@ -1144,7 +1155,7 @@
             '<div class="field"><label for="pointageType">Type de liste</label><select id="pointageType" class="selectNiveau">' + options + '</select></div>' +
             '<div class="field"><label for="pointageDate">Date</label><input type="date" id="pointageDate" value="' + pointageDate + '"></div>' +
             '<div class="field grow"><label for="pointageTitre">Titre (facultatif)</label><input type="text" id="pointageTitre" value="' + escapeHtml(p.titre) + '" placeholder="Ex : Sortie au musée"></div>' +
-            '<div class="field"><label for="pointageVides">Lignes vides en plus</label><input type="number" id="pointageVides" min="0" max="15" value="' + (parseInt(p.lignesVides, 10) || 0) + '"></div>' +
+            '<div class="field"><label for="pointageVides">Lignes vides en plus</label><input type="number" id="pointageVides" min="0" max="' + MAX_LIGNES_VIDES + '" value="' + bornerLignesVides(p.lignesVides) + '"></div>' +
             '</div>' +
             '<div class="notePointage" id="notePointage" hidden></div>' +
             '<details class="selectionPointage" open>' +
@@ -1177,7 +1188,7 @@
             rafraichirFeuillePointage();
         });
         $('pointageVides').addEventListener('input', function () {
-            state.pointage.lignesVides = Math.max(0, Math.min(15, parseInt(this.value, 10) || 0));
+            state.pointage.lignesVides = bornerLignesVides(this.value);
             sauvegarder();
             rafraichirFeuillePointage();
         });
@@ -1192,13 +1203,11 @@
         $('btnPointagePre').addEventListener('click', reinitialiserSelectionPointage);
         $('btnPointageTous').addEventListener('click', function () {
             pointageSelection = state.eleves.map(function (el) { return el.id; });
-            rafraichirSelectionPointage();
-            rafraichirFeuillePointage();
+            rafraichirPointage();
         });
         $('btnPointageAucun').addEventListener('click', function () {
             pointageSelection = [];
-            rafraichirSelectionPointage();
-            rafraichirFeuillePointage();
+            rafraichirPointage();
         });
         $('btnImprimerPointage').addEventListener('click', function () { lancerImpressionSections(['pointage']); });
 
@@ -1206,10 +1215,8 @@
             reinitialiserSelectionPointage();
         } else {
             // La sélection en cours survit à un changement d'onglet ; on écarte seulement les élèves supprimés.
-            pointageSelection = pointageSelection.filter(function (id) { return state.eleves.some(function (el) { return el.id === id; }); });
-            afficherNotePointage();
-            rafraichirSelectionPointage();
-            rafraichirFeuillePointage();
+            pointageSelection = pointageSelection.filter(trouverEleve);
+            rafraichirPointage();
         }
     }
 
@@ -1254,16 +1261,7 @@
                 el.pai ? 'Oui' : 'Non', el.aesh ? 'Oui' : 'Non'
             ].map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
         });
-        var bom = '﻿';
-        var blob = new Blob([bom + lignes.join('\n')], { type: 'text/csv;charset=utf-8;' });
-        var url = URL.createObjectURL(blob);
-        var lien = document.createElement('a');
-        lien.href = url;
-        lien.download = 'classe_' + new Date().toISOString().slice(0, 10) + '.csv';
-        document.body.appendChild(lien);
-        lien.click();
-        document.body.removeChild(lien);
-        URL.revokeObjectURL(url);
+        telecharger('﻿' + lignes.join('\n'), 'text/csv;charset=utf-8;', 'csv');
     }
 
     function parserLigneCSV(ligne, delimiteur) {
@@ -1315,11 +1313,11 @@
             return -1;
         }
 
-        var idx = {
-            nom: indexPour('nom'), prenom: indexPour('prenom'), genre: indexPour('genre'), dateNaissance: indexPour('dateNaissance'),
-            niveau: indexPour('niveau'), pai: indexPour('pai'), aesh: indexPour('aesh')
-        };
+        var idx = {};
+        Object.keys(ALIAS_CHAMPS).forEach(function (champ) { idx[champ] = indexPour(champ); });
         if (idx.prenom === -1) return 0;
+
+        function oui(v) { return /^(oui|o|x|1|true|vrai)$/i.test((v || '').trim()); }
 
         var ajouts = 0;
         for (var i = 1; i < lignes.length; i++) {
@@ -1330,23 +1328,15 @@
             var genreBrut = idx.genre !== -1 ? (champs[idx.genre] || '').trim().toUpperCase() : 'F';
             var genre = (genreBrut.indexOf('M') === 0 || genreBrut.indexOf('G') === 0) ? 'M' : 'F';
 
-            var oui = function (v) { return /^(oui|o|x|1|true|vrai)$/i.test((v || '').trim()); };
-
-            state.eleves.push({
-                id: uid(),
+            state.eleves.push(nouvelEleve({
                 nom: idx.nom !== -1 ? (champs[idx.nom] || '').trim() : '',
                 prenom: prenom,
                 dateNaissance: idx.dateNaissance !== -1 ? normaliserDateISO(champs[idx.dateNaissance]) : '',
                 genre: genre,
                 niveau: idx.niveau !== -1 && champs[idx.niveau] ? champs[idx.niveau].trim() : 'CP',
                 pai: idx.pai !== -1 ? oui(champs[idx.pai]) : false,
-                paiDetail: '',
-                aesh: idx.aesh !== -1 ? oui(champs[idx.aesh]) : false, aeshJours: nouveauGarderieJours(),
-                groupe: null,
-                cantine: false, cantineSansViande: false, cantineSansPorc: false,
-                allergie: '', remarque: '',
-                garderie: false, garderieJours: nouveauGarderieJours()
-            });
+                aesh: idx.aesh !== -1 ? oui(champs[idx.aesh]) : false
+            }));
             ajouts++;
         }
         return ajouts;
@@ -1385,15 +1375,7 @@
             apcSeances: state.apcSeances,
             pointage: state.pointage
         };
-        var blob = new Blob([JSON.stringify(donnees, null, 2)], { type: 'application/json;charset=utf-8;' });
-        var url = URL.createObjectURL(blob);
-        var lien = document.createElement('a');
-        lien.href = url;
-        lien.download = 'classe_' + new Date().toISOString().slice(0, 10) + '.json';
-        document.body.appendChild(lien);
-        lien.click();
-        document.body.removeChild(lien);
-        URL.revokeObjectURL(url);
+        telecharger(JSON.stringify(donnees, null, 2), 'application/json;charset=utf-8;', 'json');
     }
 
     function chargerDonneesJSON(donnees) {
@@ -1405,11 +1387,9 @@
         state.nbGroupes = donnees.nbGroupes || 4;
         state.nomsGroupes = donnees.nomsGroupes || [];
         state.couleursGroupes = donnees.couleursGroupes || [];
-        state.notes = (donnees.notes || EXEMPLES_NOTES.slice()).map(function (n) {
-            return typeof n === 'string' ? { emoji: '', texte: n } : n;
-        });
+        state.notes = normaliserNotes(donnees.notes || EXEMPLES_NOTES.slice());
         state.apcSeances = donnees.apcSeances || [];
-        state.pointage = Object.assign({ type: 'cantine', titre: '', lignesVides: 2 }, donnees.pointage || {});
+        state.pointage = Object.assign({}, POINTAGE_DEFAUT, donnees.pointage);
         pointageSelection = null;
         sauvegarder();
         render();
@@ -1424,15 +1404,10 @@
         var lecteur = new FileReader();
         lecteur.onload = function (evt) {
             $('fileImportJson').value = '';
-            var donnees;
-            try {
-                donnees = JSON.parse(evt.target.result);
-            } catch (err) {
-                showConfirm('Fichier invalide', 'Ce fichier n\'est pas un export JSON valide de cet outil.', function () {}, { libelleConfirmer: 'OK', bleu: true });
-                return;
-            }
+            var donnees = null;
+            try { donnees = JSON.parse(evt.target.result); } catch (err) {}
             if (!donnees || !Array.isArray(donnees.eleves)) {
-                showConfirm('Fichier invalide', 'Ce fichier ne semble pas être un export JSON valide de cet outil.', function () {}, { libelleConfirmer: 'OK', bleu: true });
+                showConfirm('Fichier invalide', 'Ce fichier n\'est pas un export JSON valide de cet outil.', function () {}, { libelleConfirmer: 'OK', bleu: true });
                 return;
             }
             showConfirm('Importer ce fichier', 'Cela remplacera la classe actuellement chargée (' + state.eleves.length + ' élève(s)) par celle du fichier (' + donnees.eleves.length + ' élève(s)). Continuer ?', function () {
@@ -1446,72 +1421,67 @@
     // Repliés par défaut, ils ne s'ouvrent que sur un clic direct sur leur bouton, et se
     // referment au clic ailleurs (ou sur l'un de leurs propres boutons d'action).
 
+    function fermerMenus() {
+        document.querySelectorAll('.dropdownMenu').forEach(function (m) { m.hidden = true; });
+        document.querySelectorAll('.dropdown > .softButton').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+    }
+
     function initMenuDeroulant(idBouton, idMenu) {
         var bouton = $(idBouton);
         var menu = $(idMenu);
         bouton.addEventListener('click', function (e) {
             e.stopPropagation();
             var etaitOuvert = !menu.hidden;
-            document.querySelectorAll('.dropdownMenu').forEach(function (m) { m.hidden = true; });
-            document.querySelectorAll('.dropdown > .softButton').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+            fermerMenus();
             menu.hidden = etaitOuvert;
             bouton.setAttribute('aria-expanded', etaitOuvert ? 'false' : 'true');
         });
     }
     initMenuDeroulant('btnMenuCsv', 'menuCsv');
     initMenuDeroulant('btnMenuJson', 'menuJson');
+    // Un clic ailleurs referme menus déroulants et popovers (couleurs de groupe, emojis).
     document.addEventListener('click', function () {
-        document.querySelectorAll('.dropdownMenu').forEach(function (m) { m.hidden = true; });
-        document.querySelectorAll('.dropdown > .softButton').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+        fermerMenus();
+        document.querySelectorAll('.popoverCouleurs, .popoverEmojis').forEach(function (p) { p.remove(); });
     });
 
     // ---------- Impression (options par onglet) ----------
 
     var SECTIONS_IMPRESSION = [
-        { cle: 'liste', label: 'Liste des élèves', rendu: function () { renderListe(); } },
-        { cle: 'pyramide', label: 'Pyramide des âges', rendu: function () { renderPyramide(); } },
-        { cle: 'anniversaires', label: 'Anniversaires', rendu: function () { renderAnniversaires(); } },
-        { cle: 'groupes', label: 'Groupes', rendu: function () { renderGroupes(); } },
-        { cle: 'cantine', label: 'Cantine / Garderie', rendu: function () { renderCantine(); } },
-        { cle: 'autres', label: 'Informations (pense-bête)', rendu: function () { renderAutres(); } },
-        { cle: 'apc', label: 'Suivi APC', rendu: function () { renderApc(); } },
-        { cle: 'pointage', label: 'Feuille de pointage', rendu: function () { renderPointage(); } }
+        { cle: 'liste', label: 'Liste des élèves', rendu: renderListe },
+        { cle: 'pyramide', label: 'Pyramide des âges', rendu: renderPyramide },
+        { cle: 'anniversaires', label: 'Anniversaires', rendu: renderAnniversaires },
+        { cle: 'groupes', label: 'Groupes', rendu: renderGroupes },
+        { cle: 'cantine', label: 'Cantine / Garderie', rendu: renderCantine },
+        { cle: 'autres', label: 'Informations (pense-bête)', rendu: renderAutres },
+        { cle: 'apc', label: 'Suivi APC', rendu: renderApc },
+        { cle: 'pointage', label: 'Feuille de pointage', rendu: renderPointage }
     ];
 
     function showPrintOptions() {
-        dernierFocus = document.activeElement;
         var options = SECTIONS_IMPRESSION.map(function (s) {
             return '<label class="checkLabel" style="display:flex; margin-bottom:8px;"><input type="checkbox" class="chkSectionImpression" value="' + s.cle + '"' + (s.cle === state.activeTab ? ' checked' : '') + '> ' + escapeHtml(s.label) + '</label>';
         }).join('');
-        modalRoot.innerHTML =
-            '<div class="modaleOverlay" id="overlayModale">' +
-            '  <div class="modaleBox" role="dialog" aria-modal="true">' +
-            '    <h3>🖨️ Que voulez-vous imprimer ?</h3>' +
-            '    <p>Choisissez une ou plusieurs sections à inclure (chacune sur sa propre page).</p>' +
-            '    <div class="optionsImpression">' + options + '</div>' +
-            '    <div class="modaleActions">' +
-            '      <button type="button" class="btnAnnuler" id="btnModaleAnnuler">Annuler</button>' +
-            '      <button type="button" class="btnConfirmer bleu" id="btnModaleConfirmer">Imprimer</button>' +
-            '    </div>' +
-            '  </div>' +
-            '</div>';
-        $('btnModaleAnnuler').addEventListener('click', fermerModale);
-        $('overlayModale').addEventListener('click', function (e) { if (e.target.id === 'overlayModale') fermerModale(); });
-        $('btnModaleConfirmer').addEventListener('click', function () {
-            var choisies = [].slice.call(modalRoot.querySelectorAll('.chkSectionImpression:checked')).map(function (cb) { return cb.value; });
+        ouvrirModale(
+            '<h3>🖨️ Que voulez-vous imprimer ?</h3>' +
+            '<p>Choisissez une ou plusieurs sections à inclure (chacune sur sa propre page).</p>' +
+            '<div class="optionsImpression">' + options + '</div>',
+            'Imprimer', { libelleAnnuler: 'Annuler' }
+        ).addEventListener('click', function () {
+            var choisies = [...modalRoot.querySelectorAll('.chkSectionImpression:checked')].map(function (cb) { return cb.value; });
             fermerModale();
             if (choisies.length) lancerImpressionSections(choisies);
         });
-        $('btnModaleConfirmer').focus();
     }
 
     function lancerImpressionSections(cles) {
-        var parCle = {};
-        SECTIONS_IMPRESSION.forEach(function (s) { parCle[s.cle] = s; });
-        cles.forEach(function (cle) { if (parCle[cle]) parCle[cle].rendu(); });
+        function retirerMarquage() {
+            document.querySelectorAll('.tabPanel').forEach(function (p) { p.classList.remove('a-imprimer', 'sautDePage'); });
+        }
+        SECTIONS_IMPRESSION.forEach(function (s) { if (cles.indexOf(s.cle) !== -1) s.rendu(); });
         document.body.classList.add('impressionCiblee');
 
-        document.querySelectorAll('.tabPanel').forEach(function (p) { p.classList.remove('a-imprimer', 'sautDePage'); });
+        retirerMarquage();
         cles.forEach(function (cle, i) {
             var panel = $('panel-' + cle);
             if (!panel) return;
@@ -1520,7 +1490,7 @@
         });
 
         function nettoyer() {
-            document.querySelectorAll('.tabPanel').forEach(function (p) { p.classList.remove('a-imprimer', 'sautDePage'); });
+            retirerMarquage();
             document.body.classList.remove('impressionCiblee');
             render();
             window.removeEventListener('afterprint', nettoyer);
@@ -1534,10 +1504,7 @@
     // ---------- Aide / à propos ----------
 
     function showAide() {
-        dernierFocus = document.activeElement;
-        modalRoot.innerHTML =
-            '<div class="modaleOverlay" id="overlayModale">' +
-            '  <div class="modaleBox large" role="dialog" aria-modal="true">' +
+        ouvrirModale(
             '    <h3>🎓 Aide — Ma Classe en Boîte</h3>' +
             '    <div class="corpsAide">' +
             '      <h4>📋 Liste</h4><p>Ajoutez vos élèves via le formulaire en haut de page. Modifiez n\'importe quel champ directement dans le tableau, triez en cliquant sur l\'en-tête d\'une colonne.</p>' +
@@ -1554,15 +1521,9 @@
             '      </ul>' +
             '      <h4>🖨️ Imprimer</h4><p>Choisissez la ou les sections à imprimer : chacune démarre sur une nouvelle page.</p>' +
             '      <p class="creditAide">Outil développé par <strong>Etienne Liaudet</strong> — Mission numérique 76 (DSDEN de la Seine-Maritime).</p>' +
-            '    </div>' +
-            '    <div class="modaleActions">' +
-            '      <button type="button" class="btnConfirmer bleu" id="btnModaleConfirmer">Fermer</button>' +
-            '    </div>' +
-            '  </div>' +
-            '</div>';
-        $('btnModaleConfirmer').addEventListener('click', fermerModale);
-        $('overlayModale').addEventListener('click', function (e) { if (e.target.id === 'overlayModale') fermerModale(); });
-        $('btnModaleConfirmer').focus();
+            '    </div>',
+            'Fermer', { large: true }
+        ).addEventListener('click', fermerModale);
     }
 
     $('btnAide').addEventListener('click', showAide);
