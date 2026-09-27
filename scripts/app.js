@@ -340,8 +340,12 @@
         document.querySelectorAll('.tabPanel').forEach(function (p) {
             p.classList.toggle('active', p.id === 'panel-' + tab);
         });
+        // Pointage a son propre bouton d'impression ; le plan de classe est encore en construction.
+        $('barrePdfOnglet').style.display = (tab === 'pointage' || tab === 'plan') ? 'none' : '';
         render();
     }
+
+    $('btnPdfOnglet').addEventListener('click', function () { lancerImpressionSections([state.activeTab]); });
 
     function render() {
         switch (state.activeTab) {
@@ -355,6 +359,24 @@
             case 'pointage': renderPointage(); break;
             case 'plan': renderPlanClasse(); break;
         }
+    }
+
+    // Version imprimable (PDF) d'un onglet dont l'affichage écran est fait de champs éditables.
+    function tableImpression(entetes, lignes) {
+        return '<table class="tablePointage tableImpression print-only"><thead><tr>' +
+            entetes.map(function (e) { return '<th>' + e + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            lignes.map(function (l) { return '<tr>' + l.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') +
+            '</tbody></table>';
+    }
+
+    // Résumé des demi-journées cochées : « Lun matin + soir · Mar matin ».
+    function resumeJours(jours, libelleApresMidi) {
+        if (!jours) return '';
+        return JOURS_SEMAINE.map(function (j) {
+            var d = jours[j.cle] || {};
+            var creneaux = (d.matin ? ['matin'] : []).concat(d.apresmidi ? [libelleApresMidi] : []);
+            return creneaux.length ? j.label + ' ' + creneaux.join(' + ') : '';
+        }).filter(Boolean).join(' · ');
     }
 
     function elevesVides(message) {
@@ -427,14 +449,18 @@
 
         panel.innerHTML =
             '<div class="panelHeader"><h2 style="margin:0;">Liste de la classe</h2><span class="countBadge">' + state.eleves.length + (state.eleves.length > 1 ? ' élèves' : ' élève') + '</span></div>' +
-            '<div class="tableWrap"><table class="listeTable"><thead><tr>' +
+            '<div class="tableWrap no-print"><table class="listeTable"><thead><tr>' +
             '<th class="' + classeTri('nom') + '" data-sort="nom">Nom</th>' +
             '<th class="' + classeTri('prenom') + '" data-sort="prenom">Prénom</th>' +
             '<th class="' + classeTri('genre') + '" data-sort="genre">Genre</th>' +
             '<th class="' + classeTri('dateNaissance') + '" data-sort="dateNaissance">Naissance</th>' +
             '<th class="' + classeTri('niveau') + '" data-sort="niveau">Niveau</th>' +
             '<th>PAI</th><th>AESH</th><th class="no-print">Actions</th>' +
-            '</tr></thead><tbody>' + lignes + '</tbody></table></div>';
+            '</tr></thead><tbody>' + lignes + '</tbody></table></div>' +
+            tableImpression(['N°', 'Nom', 'Prénom', 'Genre', 'Naissance', 'Niveau', 'PAI', 'AESH'], elevesTries().map(function (el, i) {
+                return [i + 1, escapeHtml((el.nom || '').toUpperCase()), escapeHtml(el.prenom), el.genre === 'M' ? 'G' : 'F',
+                    formatDateFR(el.dateNaissance), escapeHtml(el.niveau), el.pai ? 'Oui' + (el.paiDetail ? ' : ' + escapeHtml(el.paiDetail) : '') : '', el.aesh ? 'Oui' : ''];
+            }));
 
         panel.querySelectorAll('th[data-sort]').forEach(function (th) {
             th.addEventListener('click', function () {
@@ -615,7 +641,7 @@
                 '</li>';
         }
 
-        var htmlNonAssignes = '<div class="zoneGroupe nonAssignes" data-groupe="0">' +
+        var htmlNonAssignes = '<div class="zoneGroupe nonAssignes' + (nonAssignes.length ? '' : ' no-print') + '" data-groupe="0">' +
             '<div class="zoneGroupeTitre"><span class="nomGroupe">Élèves non assignés</span><span class="compte">' + nonAssignes.length + '</span></div>' +
             '<ul style="list-style:none; margin:0; padding:0;">' + (nonAssignes.map(function (e) { return etiquette(e, false); }).join('') || '<li class="annivVide">Aucun</li>') + '</ul>' +
             '</div>';
@@ -800,7 +826,15 @@
                 '</div>';
         }).join('');
 
-        panel.innerHTML = '<h2 style="margin-top:0;">Cantine et garderie</h2><div class="grilleCantine">' + cartes + '</div>';
+        var impression = tableImpression(['Élève', 'Cantine', 'Garderie', 'Présence AESH', 'Allergie / PAI', 'Remarque'], elevesTries().map(function (el) {
+            var regime = [el.cantineSansViande ? 'sans viande' : '', el.cantineSansPorc ? 'sans porc' : ''].filter(Boolean).join(', ');
+            var sante = [el.allergie ? 'Allergie : ' + el.allergie : '', el.pai ? 'PAI' + (el.paiDetail ? ' : ' + el.paiDetail : '') : ''].filter(Boolean).join(' — ');
+            return [escapeHtml(nomComplet(el)), el.cantine ? 'Oui' + (regime ? ' (' + regime + ')' : '') : '—',
+                el.garderie ? escapeHtml(resumeJours(el.garderieJours, 'soir')) || 'Oui' : '—',
+                el.aesh ? escapeHtml(resumeJours(el.aeshJours, 'après-midi')) || 'Oui' : '',
+                escapeHtml(sante), escapeHtml(el.remarque || '')];
+        }));
+        panel.innerHTML = '<h2 style="margin-top:0;">Cantine et garderie</h2><div class="grilleCantine no-print">' + cartes + '</div>' + impression;
 
         panel.querySelectorAll('.champInfoCantine').forEach(function (input) {
             input.addEventListener('change', function () {
@@ -845,8 +879,11 @@
 
         panel.innerHTML =
             '<h2 style="margin-top:0;">📝 Informations importantes de la classe</h2>' +
-            '<p class="autresIntro">Notez ici vos codes ou informations diverses de la classe (une ligne par information, avec un emoji au choix pour vous repérer), à consulter ou imprimer à tout moment.</p>' +
-            '<div class="boiteNotes">' + lignes + '</div>' +
+            '<p class="autresIntro no-print">Notez ici vos codes ou informations diverses de la classe (une ligne par information, avec un emoji au choix pour vous repérer), à consulter ou imprimer à tout moment.</p>' +
+            '<div class="boiteNotes no-print">' + lignes + '</div>' +
+            '<ul class="notesImpression print-only">' + state.notes.filter(function (n) { return (n.texte || '').trim(); }).map(function (n) {
+                return '<li>' + (n.emoji ? n.emoji + ' ' : '') + escapeHtml(n.texte) + '</li>';
+            }).join('') + '</ul>' +
             '<button type="button" id="btnAjouterNote" class="softButton btnAjouterNote no-print">+ Ajouter une ligne</button>';
 
         panel.querySelectorAll('.editInput[data-index]').forEach(function (input) {
@@ -979,8 +1016,7 @@
 
     var TYPES_POINTAGE = {
         cantine: { label: '🍽️ Cantine', titre: 'Pointage cantine' },
-        garderieMatin: { label: '🌅 Garderie du matin', titre: 'Pointage garderie du matin' },
-        garderieSoir: { label: '🌇 Garderie du soir', titre: 'Pointage garderie du soir' },
+        garderie: { label: '🌅 Garderie (matin et soir)', titre: 'Pointage garderie' },
         apc: { label: '🎯 APC', titre: 'Pointage APC' },
         sortie: { label: '🚌 Sortie / appel', titre: 'Liste d\'appel' },
         // Listes « grille » : N°, élève et colonnes vides à remplir à la main.
@@ -1031,6 +1067,11 @@
         return Math.max(1, Math.min(MAX_COLONNES_VIDES, parseInt(v, 10) || 1));
     }
 
+    // periode : 'matin' ou 'apresmidi' (garderie du soir).
+    function inscritGarderie(el, jour, periode) {
+        return !!(jour && el.garderie && el.garderieJours && el.garderieJours[jour] && el.garderieJours[jour][periode]);
+    }
+
     // Élèves à inclure d'office selon le type de liste et la date.
     function preremplissagePointage(type, dateIso) {
         var ids = [], note = '', domaine = '';
@@ -1038,15 +1079,14 @@
         if (type === 'cantine') {
             ids = state.eleves.filter(function (el) { return el.cantine; }).map(function (el) { return el.id; });
             if (!ids.length) note = 'Aucun élève n\'est inscrit à la cantine (onglet Cantine / Garderie) : cochez les élèves concernés.';
-        } else if (type === 'garderieMatin' || type === 'garderieSoir') {
-            var periode = type === 'garderieMatin' ? 'matin' : 'apresmidi';
+        } else if (type === 'garderie') {
             if (!jour) {
                 note = 'Cette date tombe un week-end : aucune garderie prévue.';
             } else {
                 ids = state.eleves.filter(function (el) {
-                    return el.garderie && el.garderieJours && el.garderieJours[jour] && el.garderieJours[jour][periode];
+                    return inscritGarderie(el, jour, 'matin') || inscritGarderie(el, jour, 'apresmidi');
                 }).map(function (el) { return el.id; });
-                if (!ids.length) note = 'Aucun élève inscrit à cette garderie ce jour-là (onglet Cantine / Garderie) : cochez les élèves concernés.';
+                if (!ids.length) note = 'Aucun élève inscrit à la garderie ce jour-là (onglet Cantine / Garderie) : cochez les élèves concernés.';
             }
         } else if (type === 'apc') {
             var seances = state.apcSeances.filter(function (s) { return s.date === dateIso; });
@@ -1089,8 +1129,14 @@
                 } },
                 remarque];
         }
-        if (type === 'garderieMatin' || type === 'garderieSoir') {
-            return [caseCoche, eleve, vide('Arrivée', 'colHeure'), vide('Départ', 'colHeure'), remarque];
+        if (type === 'garderie') {
+            // Case à cocher si l'élève est inscrit à ce créneau ce jour-là, « — » sinon.
+            var creneau = function (titre, periode) {
+                return { titre: titre, classe: 'colCase', cellule: function (el) {
+                    return inscritGarderie(el, cleJourSemaine(pointageDate), periode) ? '<span class="caseCoche"></span>' : '—';
+                } };
+            };
+            return [eleve, creneau('Matin', 'matin'), vide('Arrivée', 'colHeure'), creneau('Soir', 'apresmidi'), vide('Départ', 'colHeure'), remarque];
         }
         if (type === 'apc') {
             return [caseCoche, eleve,
@@ -1115,6 +1161,13 @@
             var sansPorc = choisis.filter(function (el) { return el.cantineSansPorc; }).length;
             if (sansViande) details.push(sansViande + ' sans viande');
             if (sansPorc) details.push(sansPorc + ' sans porc');
+        }
+        if (type === 'garderie') {
+            var jour = cleJourSemaine(pointageDate);
+            ['matin', 'apresmidi'].forEach(function (periode) {
+                var n = choisis.filter(function (el) { return inscritGarderie(el, jour, periode); }).length;
+                details.push(n + (periode === 'matin' ? ' le matin' : ' le soir'));
+            });
         }
         var domaine = preremplissagePointage(type, pointageDate).domaine;
         if (domaine) details.push('Domaine : ' + domaine);
@@ -1190,6 +1243,7 @@
             return;
         }
         var p = state.pointage;
+        if (p.type === 'garderieMatin' || p.type === 'garderieSoir') p.type = 'garderie'; // anciens types, fusionnés
         if (!TYPES_POINTAGE[p.type]) p.type = 'cantine';
         if (!pointageDate) pointageDate = aujourdHuiISO();
 
@@ -1595,13 +1649,13 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
-            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie matin et soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +
             '        <li><strong>JSON</strong> : sauvegarde complète et fidèle de tout l\'outil (élèves, groupes, notes, APC…), pour reprendre le travail plus tard, y compris sur un autre appareil.</li>' +
             '      </ul>' +
-            '      <h4>🖨️ Imprimer</h4><p>Choisissez la ou les sections à imprimer : chacune démarre sur une nouvelle page.</p>' +
+            '      <h4>🖨️ Imprimer / PDF</h4><p>Le bouton « Exporter cet onglet en PDF » (au-dessus de chaque onglet) imprime l\'onglet affiché : choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression. Le bouton « Imprimer » en haut de page permet de regrouper plusieurs sections, chacune sur une nouvelle page.</p>' +
             '      <p class="creditAide">Outil développé par <strong>Etienne Liaudet</strong> — Mission numérique 76 (DSDEN de la Seine-Maritime).</p>' +
             '    </div>',
             'Fermer', { large: true }
