@@ -1143,7 +1143,9 @@
             '<tbody>' + lignes.join('') + '</tbody></table>';
 
         // Orientation d'impression (listes rapide / générale) : appliquée via des pages nommées en CSS (@page portrait / paysage).
-        $('feuillePointage').className = 'feuillePointage' + (def.grille ? ' ' + (p.orientation === 'paysage' ? 'paysage' : 'portrait') : '');
+        // En paysage, au-delà de 27 lignes (élèves, bandeaux de niveau, lignes vides), on resserre pour tenir sur une page.
+        var paysage = p.orientation === 'paysage';
+        $('feuillePointage').className = 'feuillePointage' + (def.grille ? (paysage ? ' paysage' : ' portrait') + (paysage && lignes.length > 27 ? ' compacte' : '') : '');
         $('feuillePointage').innerHTML =
             '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || def.titre) + '</h2>' +
             '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
