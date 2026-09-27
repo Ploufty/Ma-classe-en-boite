@@ -30,7 +30,9 @@
     ];
 
     // affichage : 'nomPrenom' | 'prenomNom' | 'prenom' ; tri : 'nom' | 'prenom' ; colonnesVides : null = valeur du type.
-    var POINTAGE_DEFAUT = { type: 'cantine', titre: '', lignesVides: 2, affichage: 'nomPrenom', tri: 'nom', parNiveau: false, colonnesVides: null, orientation: 'portrait' };
+    // perso : options de la liste personnalisée (colonnes choisies, 2 exemplaires, ligne vierge au-dessus des en-têtes).
+    var POINTAGE_DEFAUT = { type: 'generale', titre: '', lignesVides: 2, affichage: 'nomPrenom', tri: 'nom', parNiveau: false, colonnesVides: null, orientation: 'portrait',
+        perso: { colonnes: ['num', 'presence'], deuxExemplaires: false, enteteVierge: true, colonnesVides: null } };
     var MAX_COLONNES_VIDES = 8;
     var MAX_LIGNES_VIDES = 15;
 
@@ -1014,15 +1016,44 @@
     // les onglets Cantine / Garderie / Suivi APC, ajustable à la main, puis imprimée (ou enregistrée
     // en PDF depuis la fenêtre d'impression du navigateur).
 
+    // L'ordre des clés est celui des sous-onglets. Listes « grille » : N°, élève et colonnes vides à remplir à la main.
     var TYPES_POINTAGE = {
+        generale: { label: '📋 Liste générale', titre: 'Liste de la classe', grille: true, colonnesVides: 5 },
+        rapide: { label: '⚡ Liste rapide', titre: 'Liste de la classe', grille: true, colonnesVides: 2 },
         cantine: { label: '🍽️ Cantine', titre: 'Pointage cantine' },
-        garderie: { label: '🌅 Garderie (matin et soir)', titre: 'Pointage garderie' },
+        garderie: { label: '🌅 Garderie', titre: 'Pointage garderie' },
         apc: { label: '🎯 APC', titre: 'Pointage APC' },
         sortie: { label: '🚌 Sortie / appel', titre: 'Liste d\'appel' },
-        // Listes « grille » : N°, élève et colonnes vides à remplir à la main.
-        rapide: { label: '⚡ Liste rapide (2 exemplaires)', titre: 'Liste de la classe', grille: true, colonnesVides: 2 },
-        generale: { label: '📋 Liste générale', titre: 'Liste de la classe', grille: true, colonnesVides: 5 }
+        perso: { label: '✨ Liste personnalisée', titre: 'Liste de la classe', grille: true, colonnesVides: 2 }
     };
+
+    // Colonnes proposées dans la liste personnalisée (N° et Présent se placent avant le nom, les autres après).
+    var COLONNES_PERSO = [
+        { cle: 'num', titre: 'N°', classe: 'colNum', avantNom: true, cellule: function (el, numero) { return numero; } },
+        { cle: 'presence', titre: 'Présent', classe: 'colCase', avantNom: true, cellule: function () { return '<span class="caseCoche"></span>'; } },
+        { cle: 'niveau', titre: 'Niveau', classe: 'colInfo', cellule: function (el) { return escapeHtml(el.niveau || ''); } },
+        { cle: 'naissance', titre: 'Naissance', classe: 'colInfo', cellule: function (el) { return formatDateFR(el.dateNaissance); } },
+        { cle: 'genre', titre: 'Genre', classe: 'colInfo', cellule: function (el) { return el.genre === 'M' ? 'G' : 'F'; } },
+        { cle: 'cantine', titre: 'Cantine', classe: 'colInfo', cellule: function (el) {
+            if (!el.cantine) return '—';
+            var r = [el.cantineSansViande ? 'sans viande' : '', el.cantineSansPorc ? 'sans porc' : ''].filter(Boolean).join(', ');
+            return 'Oui' + (r ? ' (' + r + ')' : '');
+        } },
+        { cle: 'garderie', titre: 'Garderie du jour', classe: 'colInfo', cellule: function (el) {
+            var jour = cleJourSemaine(pointageDate);
+            return [inscritGarderie(el, jour, 'matin') ? 'matin' : '', inscritGarderie(el, jour, 'apresmidi') ? 'soir' : ''].filter(Boolean).join(' + ') || '—';
+        } },
+        { cle: 'sante', titre: 'Allergie / PAI', classe: 'colInfo', cellule: function (el) {
+            return escapeHtml([el.allergie ? 'Allergie : ' + el.allergie : '', el.pai ? 'PAI' + (el.paiDetail ? ' : ' + el.paiDetail : '') : ''].filter(Boolean).join(' — '));
+        } },
+        { cle: 'aesh', titre: 'AESH', classe: 'colInfo', cellule: function (el) { return el.aesh ? 'Oui' : ''; } },
+        { cle: 'remarque', titre: 'Remarque', classe: 'colInfo', cellule: function (el) { return escapeHtml(el.remarque || ''); } }
+    ];
+
+    // Lecture sans risque des options perso (les valeurs par défaut ne sont jamais modifiées en place).
+    function optionsPerso() {
+        return Object.assign({}, POINTAGE_DEFAUT.perso, state.pointage.perso);
+    }
     var pointageSelection = null; // ids des élèves inclus dans la feuille ; null = pas encore calculé
     var pointageDate = '';        // date de la feuille (aujourd'hui par défaut, non conservée entre deux sessions)
 
@@ -1062,9 +1093,17 @@
         });
     }
 
+    // Nombre de colonnes vides de la feuille : la liste personnalisée garde le sien (il n'est pas remis à zéro en changeant de sous-onglet).
+    function nbColonnesVides(type) {
+        return bornerColonnesVides(type === 'perso' ? optionsPerso().colonnesVides : state.pointage.colonnesVides, type);
+    }
+
+    // La liste personnalisée accepte 0 colonne vide (si elle ne contient que des colonnes d'informations).
     function bornerColonnesVides(v, type) {
+        var min = type === 'perso' ? 0 : 1;
         if (v === null || v === undefined || v === '') return TYPES_POINTAGE[type].colonnesVides || 0;
-        return Math.max(1, Math.min(MAX_COLONNES_VIDES, parseInt(v, 10) || 1));
+        var n = parseInt(v, 10);
+        return Math.max(min, Math.min(MAX_COLONNES_VIDES, isNaN(n) ? min : n));
     }
 
     // periode : 'matin' ou 'apresmidi' (garderie du soir).
@@ -1107,9 +1146,17 @@
         var vide = function (titre, classe) { return { titre: titre, classe: classe, cellule: function () { return ''; } }; };
         var remarque = { titre: 'Remarque', classe: 'colLarge', cellule: function (el) { return escapeHtml(el.remarque || ''); } };
 
+        if (type === 'perso') {
+            var choix = optionsPerso().colonnes;
+            var retenues = COLONNES_PERSO.filter(function (c) { return choix.indexOf(c.cle) !== -1; });
+            var cols = retenues.filter(function (c) { return c.avantNom; }).concat([eleve], retenues.filter(function (c) { return !c.avantNom; }));
+            for (var v = 0; v < nbColonnesVides(type); v++) cols.push(vide('', 'colVide'));
+            return cols;
+        }
+
         if (TYPES_POINTAGE[type].grille) {
             var colonnes = [{ titre: 'N°', classe: 'colNum', cellule: function (el, numero) { return numero; } }, eleve];
-            for (var k = 0; k < bornerColonnesVides(state.pointage.colonnesVides, type); k++) colonnes.push(vide('', 'colVide'));
+            for (var k = 0; k < nbColonnesVides(type); k++) colonnes.push(vide('', 'colVide'));
             return colonnes;
         }
 
@@ -1150,7 +1197,10 @@
 
     function rafraichirFeuillePointage() {
         var p = state.pointage;
-        var type = TYPES_POINTAGE[p.type] ? p.type : 'cantine';
+        var type = TYPES_POINTAGE[p.type] ? p.type : 'generale';
+        var perso = optionsPerso();
+        var enteteVierge = TYPES_POINTAGE[type].grille && (type !== 'perso' || perso.enteteVierge);
+        var deuxExemplaires = type === 'rapide' || (type === 'perso' && perso.deuxExemplaires);
         var def = TYPES_POINTAGE[type];
         var choisis = elevesPourPointage().filter(function (el) { return pointageSelection.indexOf(el.id) !== -1; });
         var colonnes = colonnesPointage(type);
@@ -1191,7 +1241,7 @@
 
         // Les listes grille ont une ligne d'en-tête vierge au-dessus, pour écrire à la main le titre des colonnes.
         var table = '<table class="tablePointage' + (def.grille ? ' tableGrille' : '') + '"><thead>' +
-            (def.grille ? '<tr class="ligneTitres">' + colonnes.map(function (c) { return '<th class="' + c.classe + '"></th>'; }).join('') + '</tr>' : '') +
+            (enteteVierge ? '<tr class="ligneTitres">' + colonnes.map(function (c) { return '<th class="' + c.classe + '"></th>'; }).join('') + '</tr>' : '') +
             '<tr>' + colonnes.map(function (c) { return '<th class="' + c.classe + '">' + c.titre + '</th>'; }).join('') + '</tr></thead>' +
             '<tbody>' + lignes.join('') + '</tbody></table>';
 
@@ -1203,7 +1253,7 @@
             '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || def.titre) + '</h2>' +
             '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
             '<div class="sousTitreFeuille">' + escapeHtml(sousTitre) + '</div>' +
-            (type === 'rapide' ? '<div class="duoPointage">' + table + table + '</div>' : table) +
+            (deuxExemplaires ? '<div class="duoPointage">' + table + table + '</div>' : table) +
             (def.grille ? '' : '<div class="piedFeuille"><span>Présents : ……… / ' + choisis.length + '</span><span>Pointage effectué par : ……………………………</span></div>');
     }
 
@@ -1244,7 +1294,7 @@
         }
         var p = state.pointage;
         if (p.type === 'garderieMatin' || p.type === 'garderieSoir') p.type = 'garderie'; // anciens types, fusionnés
-        if (!TYPES_POINTAGE[p.type]) p.type = 'cantine';
+        if (!TYPES_POINTAGE[p.type]) p.type = 'generale';
         if (!pointageDate) pointageDate = aujourdHuiISO();
 
         function options(valeurs, actuelle) {
@@ -1252,13 +1302,26 @@
                 return '<option value="' + cle + '"' + (cle === actuelle ? ' selected' : '') + '>' + valeurs[cle] + '</option>';
             }).join('');
         }
-        var libellesTypes = {};
-        Object.keys(TYPES_POINTAGE).forEach(function (cle) { libellesTypes[cle] = TYPES_POINTAGE[cle].label; });
+        var sousOnglets = Object.keys(TYPES_POINTAGE).map(function (cle) {
+            var actif = cle === p.type;
+            return '<button type="button" class="sousOnglet' + (cle === 'perso' ? ' sousOngletPerso' : '') + (actif ? ' active' : '') + '" role="tab" aria-selected="' + actif + '" data-type="' + cle + '">' + TYPES_POINTAGE[cle].label + '</button>';
+        }).join('');
+        var perso = optionsPerso();
+        var blocPerso = p.type !== 'perso' ? '' :
+            '<fieldset class="optionsPerso"><legend>Colonnes à inclure (en plus du nom de l\'élève)</legend>' +
+            '<div class="checklistEleves" id="persoColonnes">' + COLONNES_PERSO.map(function (c) {
+                return '<label class="checkLabel"><input type="checkbox" value="' + c.cle + '"' + (perso.colonnes.indexOf(c.cle) !== -1 ? ' checked' : '') + '> ' + c.titre + '</label>';
+            }).join('') + '</div>' +
+            '<div class="formRow">' +
+            '<div class="field checks"><label class="checkLabel"><input type="checkbox" id="persoDeux"' + (perso.deuxExemplaires ? ' checked' : '') + '> 2 exemplaires côte à côte</label></div>' +
+            '<div class="field checks"><label class="checkLabel"><input type="checkbox" id="persoEntete"' + (perso.enteteVierge ? ' checked' : '') + '> Ligne vierge au-dessus des en-têtes</label></div>' +
+            '</div></fieldset>';
 
         panel.innerHTML =
+            '<div class="sousOnglets no-print" role="tablist" aria-label="Type de liste">' + sousOnglets + '</div>' +
             '<div class="pointageOutils no-print">' +
+            blocPerso +
             '<div class="formRow">' +
-            '<div class="field"><label for="pointageType">Type de liste</label><select id="pointageType" class="selectNiveau">' + options(libellesTypes, p.type) + '</select></div>' +
             '<div class="field"><label for="pointageDate">Date</label><input type="date" id="pointageDate" value="' + pointageDate + '"></div>' +
             '<div class="field grow"><label for="pointageTitre">Titre (facultatif)</label><input type="text" id="pointageTitre" value="' + escapeHtml(p.titre) + '" placeholder="Ex : Sortie au musée"></div>' +
             '<div class="field"><label for="pointageVides">Lignes vides en plus</label><input type="number" id="pointageVides" min="0" max="' + MAX_LIGNES_VIDES + '" value="' + bornerLignesVides(p.lignesVides) + '"></div>' +
@@ -1269,7 +1332,7 @@
             '<div class="field"><label for="pointageTri">Ordre alphabétique</label><select id="pointageTri" class="selectNiveau">' +
             options({ nom: 'Par nom de famille', prenom: 'Par prénom' }, p.tri) + '</select></div>' +
             '<div class="field checks"><label class="checkLabel"><input type="checkbox" id="pointageParNiveau"' + (p.parNiveau ? ' checked' : '') + '> Séparer par niveau</label></div>' +
-            (TYPES_POINTAGE[p.type].grille ? '<div class="field"><label for="pointageColonnes">Colonnes à remplir</label><input type="number" id="pointageColonnes" min="1" max="' + MAX_COLONNES_VIDES + '" value="' + bornerColonnesVides(p.colonnesVides, p.type) + '"></div>' +
+            (TYPES_POINTAGE[p.type].grille ? '<div class="field"><label for="pointageColonnes">Colonnes à remplir</label><input type="number" id="pointageColonnes" min="' + (p.type === 'perso' ? 0 : 1) + '" max="' + MAX_COLONNES_VIDES + '" value="' + nbColonnesVides(p.type) + '"></div>' +
                 '<div class="field"><label for="pointageOrientation">Orientation</label><select id="pointageOrientation" class="selectNiveau">' +
                 options({ portrait: 'Portrait', paysage: 'Paysage' }, p.orientation) + '</select></div>' : '') +
             '</div>' +
@@ -1287,8 +1350,10 @@
             '</div>' +
             '<div class="feuillePointage" id="feuillePointage"></div>';
 
-        $('pointageType').addEventListener('change', function () {
-            state.pointage.type = this.value;
+        panel.querySelector('.sousOnglets').addEventListener('click', function (e) {
+            var btn = e.target.closest('.sousOnglet');
+            if (!btn || btn.dataset.type === state.pointage.type) return;
+            state.pointage.type = btn.dataset.type;
             state.pointage.titre = '';
             state.pointage.colonnesVides = null;
             // Calculée avant de redessiner : le panneau remplacé peut encore émettre un « change » tardif.
@@ -1308,8 +1373,26 @@
         optionAffichage('pointageTri', 'tri', function (e) { return e.value; });
         optionAffichage('pointageParNiveau', 'parNiveau', function (e) { return e.checked; });
         if ($('pointageColonnes')) {
-            optionAffichage('pointageColonnes', 'colonnesVides', function (e) { return bornerColonnesVides(e.value, state.pointage.type); });
+            $('pointageColonnes').addEventListener('change', function () {
+                var type = state.pointage.type, n = bornerColonnesVides(this.value, type);
+                if (type === 'perso') state.pointage.perso = Object.assign(optionsPerso(), { colonnesVides: n });
+                else state.pointage.colonnesVides = n;
+                sauvegarder();
+                rafraichirFeuillePointage();
+            });
             optionAffichage('pointageOrientation', 'orientation', function (e) { return e.value; });
+        }
+        if (p.type === 'perso') {
+            function majPerso(changement) {
+                state.pointage.perso = Object.assign(optionsPerso(), changement);
+                sauvegarder();
+                rafraichirFeuillePointage();
+            }
+            $('persoColonnes').addEventListener('change', function () {
+                majPerso({ colonnes: [...panel.querySelectorAll('#persoColonnes input:checked')].map(function (cb) { return cb.value; }) });
+            });
+            $('persoDeux').addEventListener('change', function () { majPerso({ deuxExemplaires: this.checked }); });
+            $('persoEntete').addEventListener('change', function () { majPerso({ enteteVierge: this.checked }); });
         }
         $('pointageDate').addEventListener('change', function () {
             pointageDate = this.value || aujourdHuiISO();
@@ -1649,7 +1732,7 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
-            '      <h4>🖨️ Pointage / exportation PDF</h4><p>Choisissez le type de liste (cantine, garderie matin et soir, APC, sortie / appel, liste rapide en deux exemplaires ou liste générale à colonnes vides) et la date : la feuille se pré-remplit avec les élèves concernés. Pour ces deux dernières, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🖨️ Pointage / exportation PDF</h4><p>Choisissez le type de liste dans les sous-onglets (liste générale à colonnes vides, liste rapide en deux exemplaires, cantine, garderie matin et soir, APC, sortie / appel, ou liste personnalisée) et la date : la feuille se pré-remplit avec les élèves concernés. La liste personnalisée permet de cocher les colonnes à inclure (N°, case Présent, niveau, naissance, genre, cantine, garderie du jour, allergie / PAI, AESH, remarque), d\'imprimer en deux exemplaires et d\'ajouter une ligne vierge pour titrer les colonnes. Pour les listes générale, rapide et personnalisée, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +
