@@ -5,7 +5,7 @@
     var STORAGE_REGLAGES = 'gestionClasse_reglages';
     var NIVEAUX_ORDRE = { 'PS': 1, 'MS': 2, 'GS': 3, 'CP': 4, 'CE1': 5, 'CE2': 6, 'CM1': 7, 'CM2': 8 };
     var NOMS_MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    var NOMS_MOIS_COURT = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+    var NOMS_MOIS_COURT = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
     var JOURS_SEMAINE = [
         { cle: 'lundi', label: 'Lun' },
         { cle: 'mardi', label: 'Mar' },
