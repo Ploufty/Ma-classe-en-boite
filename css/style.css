@@ -446,6 +446,20 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 44rem; }
 .barrePdfOnglet { display: flex; justify-content: flex-end; margin-bottom: .75rem; }
 
 /* ---------- 17. POINTAGE ---------- */
+/* Sous-onglets du type de liste (onglet Pointage / exportation PDF) */
+.sousOnglets { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 2px solid var(--green-soft); }
+.sousOnglet {
+    min-height: var(--tap); padding: .35rem .8rem; border-radius: 2rem; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--muted); font-weight: 700; font-size: .88rem; cursor: pointer; transition: var(--transition);
+}
+.sousOnglet:hover:not(.active) { border-color: var(--green); color: var(--green); }
+.sousOnglet.active { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.sousOnglet.sousOngletPerso { margin-left: auto; border-style: dashed; border-color: var(--green); color: var(--green); }
+.sousOnglet.sousOngletPerso.active { border-style: solid; color: var(--on-accent); }
+.optionsPerso { border: 1.5px dashed var(--green); border-radius: var(--radius); padding: .6rem 1rem .2rem; margin: 0 0 1rem; }
+.optionsPerso legend { font-weight: 700; color: var(--green); padding: 0 .4rem; }
+.optionsPerso .checklistEleves { margin-bottom: .75rem; }
+.tableGrille td.colInfo { font-size: 11px; }
 .pointageOutils { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.25rem; }
 .pointageOutils .formRow { margin-bottom: .75rem; }
 .field input[type="number"] { min-width: 0; width: 7rem; }
@@ -490,6 +504,8 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 44rem; }
 @page paysage { size: A4 landscape; margin: 8mm; }
 .duoPointage { display: flex; gap: 20px; align-items: flex-start; }
 .duoPointage .tablePointage { flex: 1; min-width: 0; }
+/* Deux exemplaires côte à côte : cellules resserrées pour que les deux tableaux tiennent dans la largeur de la page. */
+.duoPointage .tablePointage th, .duoPointage .tablePointage td { padding: 0 4px; }
 .caseCoche { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--text); border-radius: 3px; vertical-align: middle; }
 .piedFeuille { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 30px; margin-top: 18px; font-size: 13px; font-weight: 700; color: var(--text); }
 
