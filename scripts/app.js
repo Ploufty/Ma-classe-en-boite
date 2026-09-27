@@ -37,7 +37,8 @@
         nomsGroupes: [],
         couleursGroupes: [],
         notes: null,
-        apcSeances: []
+        apcSeances: [],
+        pointage: { type: 'cantine', titre: '', lignesVides: 2 }
     };
 
     function nouveauGarderieJours() {
@@ -120,7 +121,8 @@
                 nomsGroupes: state.nomsGroupes,
                 couleursGroupes: state.couleursGroupes,
                 notes: state.notes,
-                apcSeances: state.apcSeances
+                apcSeances: state.apcSeances,
+                pointage: state.pointage
             }));
         } catch (e) {}
     }
@@ -139,6 +141,7 @@
                 if (r.couleursGroupes) state.couleursGroupes = r.couleursGroupes;
                 if (r.notes) state.notes = r.notes;
                 if (r.apcSeances) state.apcSeances = r.apcSeances;
+                if (r.pointage) state.pointage = Object.assign({}, state.pointage, r.pointage);
             }
         } catch (e) {}
         // Première utilisation : on amorce le pense-bête avec des exemples plutôt que de le laisser vide.
@@ -956,15 +959,258 @@
     }
 
     // ---------- Vue Pointage (PDF) ----------
+    // Feuille de pointage pour une date précise : la sélection des élèves est pré-remplie depuis
+    // les onglets Cantine / Garderie / Suivi APC, ajustable à la main, puis imprimée (ou enregistrée
+    // en PDF depuis la fenêtre d'impression du navigateur).
+
+    var TYPES_POINTAGE = {
+        cantine: { label: '🍽️ Cantine', titre: 'Pointage cantine' },
+        garderieMatin: { label: '🌅 Garderie du matin', titre: 'Pointage garderie du matin' },
+        garderieSoir: { label: '🌇 Garderie du soir', titre: 'Pointage garderie du soir' },
+        apc: { label: '🎯 APC', titre: 'Pointage APC' },
+        sortie: { label: '🚌 Sortie / appel', titre: 'Liste d\'appel' }
+    };
+    var pointageSelection = null; // ids des élèves inclus dans la feuille ; null = pas encore calculé
+    var pointageDate = '';        // date de la feuille (aujourd'hui par défaut, non conservée entre deux sessions)
+
+    function aujourdHuiISO() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function formatDateLongue(iso) {
+        var d = dateVersObjet(iso);
+        if (!d) return '';
+        var t = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+
+    function cleJourSemaine(iso) {
+        var d = dateVersObjet(iso);
+        var jour = d ? JOURS_SEMAINE[d.getDay() - 1] : null;
+        return jour ? jour.cle : null;
+    }
+
+    function elevesAlphabetique() {
+        return state.eleves.slice().sort(function (a, b) {
+            return (a.nom || a.prenom).localeCompare(b.nom || b.prenom, 'fr', { sensitivity: 'base' }) ||
+                a.prenom.localeCompare(b.prenom, 'fr', { sensitivity: 'base' });
+        });
+    }
+
+    // Élèves à inclure d'office selon le type de liste et la date.
+    function preremplissagePointage(type, dateIso) {
+        var ids = [], note = '', domaine = '';
+        var jour = cleJourSemaine(dateIso);
+        if (type === 'cantine') {
+            ids = state.eleves.filter(function (el) { return el.cantine; }).map(function (el) { return el.id; });
+            if (!ids.length) note = 'Aucun élève n\'est inscrit à la cantine (onglet Cantine / Garderie) : cochez les élèves concernés.';
+        } else if (type === 'garderieMatin' || type === 'garderieSoir') {
+            var periode = type === 'garderieMatin' ? 'matin' : 'apresmidi';
+            if (!jour) {
+                note = 'Cette date tombe un week-end : aucune garderie prévue.';
+            } else {
+                ids = state.eleves.filter(function (el) {
+                    return el.garderie && el.garderieJours && el.garderieJours[jour] && el.garderieJours[jour][periode];
+                }).map(function (el) { return el.id; });
+                if (!ids.length) note = 'Aucun élève inscrit à cette garderie ce jour-là (onglet Cantine / Garderie) : cochez les élèves concernés.';
+            }
+        } else if (type === 'apc') {
+            var seances = state.apcSeances.filter(function (s) { return s.date === dateIso; });
+            var vus = {};
+            seances.forEach(function (s) { (s.eleveIds || []).forEach(function (id) { vus[id] = true; }); });
+            ids = state.eleves.filter(function (el) { return vus[el.id]; }).map(function (el) { return el.id; });
+            domaine = seances.map(function (s) { return s.domaine; }).filter(Boolean).join(' / ');
+            if (!seances.length) note = 'Aucune séance d\'APC enregistrée à cette date (onglet Suivi APC) : cochez les élèves concernés.';
+        } else {
+            ids = state.eleves.map(function (el) { return el.id; });
+        }
+        return { ids: ids, note: note, domaine: domaine };
+    }
+
+    function colonnesPointage(type) {
+        var caseCoche = { titre: 'Présent', classe: 'colCase', cellule: function () { return '<span class="caseCoche"></span>'; } };
+        var eleve = { titre: 'Élève', classe: 'colNom', cellule: function (el) { return escapeHtml(nomComplet(el)); } };
+        var vide = function (titre, classe) { return { titre: titre, classe: classe, cellule: function () { return ''; } }; };
+        var remarque = { titre: 'Remarque', classe: 'colLarge', cellule: function (el) { return escapeHtml(el.remarque || ''); } };
+
+        if (type === 'cantine') {
+            return [caseCoche, eleve,
+                { titre: 'Régime', classe: 'colMoyenne', cellule: function (el) {
+                    var r = [];
+                    if (el.cantineSansViande) r.push('Sans viande');
+                    if (el.cantineSansPorc) r.push('Sans porc');
+                    return escapeHtml(r.join(', '));
+                } },
+                { titre: 'Allergie / PAI', classe: 'colMoyenne', cellule: function (el) {
+                    var r = [];
+                    if (el.allergie) r.push('Allergie : ' + el.allergie);
+                    if (el.pai) r.push('PAI' + (el.paiDetail ? ' : ' + el.paiDetail : ''));
+                    return escapeHtml(r.join(' — '));
+                } },
+                remarque];
+        }
+        if (type === 'garderieMatin' || type === 'garderieSoir') {
+            return [caseCoche, eleve, vide('Arrivée', 'colHeure'), vide('Départ', 'colHeure'), remarque];
+        }
+        if (type === 'apc') {
+            return [caseCoche, eleve,
+                { titre: 'Niveau', classe: 'colHeure', cellule: function (el) { return escapeHtml(el.niveau || ''); } },
+                vide('Remarque', 'colLarge')];
+        }
+        return [caseCoche, eleve,
+            { titre: 'Autorisation reçue', classe: 'colHeure', cellule: function () { return '<span class="caseCoche"></span>'; } },
+            remarque];
+    }
+
+    function rafraichirFeuillePointage() {
+        var p = state.pointage;
+        var type = TYPES_POINTAGE[p.type] ? p.type : 'cantine';
+        var choisis = elevesAlphabetique().filter(function (el) { return pointageSelection.indexOf(el.id) !== -1; });
+        var colonnes = colonnesPointage(type);
+
+        var details = [];
+        if (type === 'cantine') {
+            var sansViande = choisis.filter(function (el) { return el.cantineSansViande; }).length;
+            var sansPorc = choisis.filter(function (el) { return el.cantineSansPorc; }).length;
+            if (sansViande) details.push(sansViande + ' sans viande');
+            if (sansPorc) details.push(sansPorc + ' sans porc');
+        }
+        var domaine = preremplissagePointage(type, pointageDate).domaine;
+        if (domaine) details.push('Domaine : ' + domaine);
+        var sousTitre = choisis.length + (choisis.length > 1 ? ' élèves attendus' : ' élève attendu') + (details.length ? ' — ' + details.join(' — ') : '');
+
+        var lignes = choisis.map(function (el) {
+            return '<tr>' + colonnes.map(function (c) { return '<td class="' + c.classe + '">' + c.cellule(el) + '</td>'; }).join('') + '</tr>';
+        });
+        var nbVides = Math.max(0, Math.min(15, parseInt(p.lignesVides, 10) || 0));
+        for (var i = 0; i < nbVides; i++) {
+            lignes.push('<tr>' + colonnes.map(function (c) {
+                return '<td class="' + c.classe + '">' + (c.classe === 'colCase' ? '<span class="caseCoche"></span>' : '') + '</td>';
+            }).join('') + '</tr>');
+        }
+
+        $('feuillePointage').innerHTML =
+            '<div class="enteteFeuille"><h2>' + escapeHtml(p.titre.trim() || TYPES_POINTAGE[type].titre) + '</h2>' +
+            '<div class="dateFeuille">' + escapeHtml(formatDateLongue(pointageDate)) + '</div></div>' +
+            '<div class="sousTitreFeuille">' + escapeHtml(sousTitre) + '</div>' +
+            '<table class="tablePointage"><thead><tr>' + colonnes.map(function (c) { return '<th class="' + c.classe + '">' + c.titre + '</th>'; }).join('') + '</tr></thead>' +
+            '<tbody>' + lignes.join('') + '</tbody></table>' +
+            '<div class="piedFeuille"><span>Présents : ……… / ' + choisis.length + '</span><span>Pointage effectué par : ……………………………</span></div>';
+    }
+
+    function majResumeSelectionPointage() {
+        $('resumeSelectionPointage').textContent = 'Élèves inclus dans la feuille (' + pointageSelection.length + ' / ' + state.eleves.length + ')';
+    }
+
+    function rafraichirSelectionPointage() {
+        $('checklistPointage').innerHTML = elevesAlphabetique().map(function (el) {
+            return '<label class="checkLabel"><input type="checkbox" value="' + el.id + '"' + (pointageSelection.indexOf(el.id) !== -1 ? ' checked' : '') + '> ' + escapeHtml(nomComplet(el)) + '</label>';
+        }).join('');
+        majResumeSelectionPointage();
+    }
+
+    function afficherNotePointage() {
+        var note = preremplissagePointage(state.pointage.type, pointageDate).note;
+        $('notePointage').textContent = note;
+        $('notePointage').hidden = !note;
+    }
+
+    // Remet la sélection sur le pré-remplissage du type et de la date courants.
+    function reinitialiserSelectionPointage() {
+        pointageSelection = preremplissagePointage(state.pointage.type, pointageDate).ids;
+        afficherNotePointage();
+        rafraichirSelectionPointage();
+        rafraichirFeuillePointage();
+    }
 
     function renderPointage() {
         var panel = $('panel-pointage');
+        if (state.eleves.length === 0) {
+            panel.innerHTML = elevesVides('Ajoutez des élèves pour préparer une feuille de pointage.');
+            return;
+        }
+        var p = state.pointage;
+        if (!TYPES_POINTAGE[p.type]) p.type = 'cantine';
+        if (!pointageDate) pointageDate = aujourdHuiISO();
+
+        var options = Object.keys(TYPES_POINTAGE).map(function (cle) {
+            return '<option value="' + cle + '"' + (cle === p.type ? ' selected' : '') + '>' + TYPES_POINTAGE[cle].label + '</option>';
+        }).join('');
+
         panel.innerHTML =
-            '<div class="placeholderTab">' +
-            '<span class="emptyIcon" aria-hidden="true">🖨️</span>' +
-            '<h2>Listes de pointage (PDF)</h2>' +
-            '<p>Cet onglet accueillera bientôt la génération de listes de pointage imprimables en PDF (cantine, garderie, sorties…). En construction.</p>' +
-            '</div>';
+            '<div class="pointageOutils no-print">' +
+            '<div class="formRow">' +
+            '<div class="field"><label for="pointageType">Type de liste</label><select id="pointageType" class="selectNiveau">' + options + '</select></div>' +
+            '<div class="field"><label for="pointageDate">Date</label><input type="date" id="pointageDate" value="' + pointageDate + '"></div>' +
+            '<div class="field grow"><label for="pointageTitre">Titre (facultatif)</label><input type="text" id="pointageTitre" value="' + escapeHtml(p.titre) + '" placeholder="Ex : Sortie au musée"></div>' +
+            '<div class="field"><label for="pointageVides">Lignes vides en plus</label><input type="number" id="pointageVides" min="0" max="15" value="' + (parseInt(p.lignesVides, 10) || 0) + '"></div>' +
+            '</div>' +
+            '<div class="notePointage" id="notePointage" hidden></div>' +
+            '<details class="selectionPointage" open>' +
+            '<summary id="resumeSelectionPointage"></summary>' +
+            '<div class="actionsSelection">' +
+            '<button type="button" class="softButton" id="btnPointagePre">↺ Pré-remplissage</button>' +
+            '<button type="button" class="softButton" id="btnPointageTous">Toute la classe</button>' +
+            '<button type="button" class="softButton" id="btnPointageAucun">Aucun</button>' +
+            '</div>' +
+            '<div class="checklistEleves" id="checklistPointage"></div>' +
+            '</details>' +
+            '<button type="button" id="btnImprimerPointage" class="primaryButton">🖨️ Imprimer / enregistrer en PDF</button>' +
+            '</div>' +
+            '<div class="feuillePointage" id="feuillePointage"></div>';
+
+        $('pointageType').addEventListener('change', function () {
+            state.pointage.type = this.value;
+            state.pointage.titre = '';
+            $('pointageTitre').value = '';
+            sauvegarder();
+            reinitialiserSelectionPointage();
+        });
+        $('pointageDate').addEventListener('change', function () {
+            pointageDate = this.value || aujourdHuiISO();
+            reinitialiserSelectionPointage();
+        });
+        $('pointageTitre').addEventListener('input', function () {
+            state.pointage.titre = this.value;
+            sauvegarder();
+            rafraichirFeuillePointage();
+        });
+        $('pointageVides').addEventListener('input', function () {
+            state.pointage.lignesVides = Math.max(0, Math.min(15, parseInt(this.value, 10) || 0));
+            sauvegarder();
+            rafraichirFeuillePointage();
+        });
+        $('checklistPointage').addEventListener('change', function (e) {
+            var id = e.target.value;
+            var i = pointageSelection.indexOf(id);
+            if (e.target.checked && i === -1) pointageSelection.push(id);
+            if (!e.target.checked && i !== -1) pointageSelection.splice(i, 1);
+            majResumeSelectionPointage();
+            rafraichirFeuillePointage();
+        });
+        $('btnPointagePre').addEventListener('click', reinitialiserSelectionPointage);
+        $('btnPointageTous').addEventListener('click', function () {
+            pointageSelection = state.eleves.map(function (el) { return el.id; });
+            rafraichirSelectionPointage();
+            rafraichirFeuillePointage();
+        });
+        $('btnPointageAucun').addEventListener('click', function () {
+            pointageSelection = [];
+            rafraichirSelectionPointage();
+            rafraichirFeuillePointage();
+        });
+        $('btnImprimerPointage').addEventListener('click', function () { lancerImpressionSections(['pointage']); });
+
+        if (pointageSelection === null) {
+            reinitialiserSelectionPointage();
+        } else {
+            // La sélection en cours survit à un changement d'onglet ; on écarte seulement les élèves supprimés.
+            pointageSelection = pointageSelection.filter(function (id) { return state.eleves.some(function (el) { return el.id === id; }); });
+            afficherNotePointage();
+            rafraichirSelectionPointage();
+            rafraichirFeuillePointage();
+        }
     }
 
     // ---------- Vue Plan de classe ----------
@@ -1136,7 +1382,8 @@
             nomsGroupes: state.nomsGroupes,
             couleursGroupes: state.couleursGroupes,
             notes: state.notes,
-            apcSeances: state.apcSeances
+            apcSeances: state.apcSeances,
+            pointage: state.pointage
         };
         var blob = new Blob([JSON.stringify(donnees, null, 2)], { type: 'application/json;charset=utf-8;' });
         var url = URL.createObjectURL(blob);
@@ -1162,6 +1409,8 @@
             return typeof n === 'string' ? { emoji: '', texte: n } : n;
         });
         state.apcSeances = donnees.apcSeances || [];
+        state.pointage = Object.assign({ type: 'cantine', titre: '', lignesVides: 2 }, donnees.pointage || {});
+        pointageSelection = null;
         sauvegarder();
         render();
     }
@@ -1225,7 +1474,8 @@
         { cle: 'groupes', label: 'Groupes', rendu: function () { renderGroupes(); } },
         { cle: 'cantine', label: 'Cantine / Garderie', rendu: function () { renderCantine(); } },
         { cle: 'autres', label: 'Informations (pense-bête)', rendu: function () { renderAutres(); } },
-        { cle: 'apc', label: 'Suivi APC', rendu: function () { renderApc(); } }
+        { cle: 'apc', label: 'Suivi APC', rendu: function () { renderApc(); } },
+        { cle: 'pointage', label: 'Feuille de pointage', rendu: function () { renderPointage(); } }
     ];
 
     function showPrintOptions() {
@@ -1259,6 +1509,7 @@
         var parCle = {};
         SECTIONS_IMPRESSION.forEach(function (s) { parCle[s.cle] = s; });
         cles.forEach(function (cle) { if (parCle[cle]) parCle[cle].rendu(); });
+        document.body.classList.add('impressionCiblee');
 
         document.querySelectorAll('.tabPanel').forEach(function (p) { p.classList.remove('a-imprimer', 'sautDePage'); });
         cles.forEach(function (cle, i) {
@@ -1270,6 +1521,7 @@
 
         function nettoyer() {
             document.querySelectorAll('.tabPanel').forEach(function (p) { p.classList.remove('a-imprimer', 'sautDePage'); });
+            document.body.classList.remove('impressionCiblee');
             render();
             window.removeEventListener('afterprint', nettoyer);
         }
@@ -1294,6 +1546,7 @@
             '      <h4>🍽️ Cantine / Garderie</h4><p>Cochez cantine et/ou garderie par élève ; le régime alimentaire, les jours de garderie, l\'allergie et une remarque libre apparaissent alors. Si AESH est coché pour un élève, ses horaires de présence par demi-journée s\'affichent aussi ici.</p>' +
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
+            '      <h4>🖨️ Pointage (PDF)</h4><p>Choisissez le type de liste (cantine, garderie du matin ou du soir, APC, sortie / appel) et la date : la feuille se pré-remplit avec les élèves concernés. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +

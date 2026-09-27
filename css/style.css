@@ -156,7 +156,8 @@ button, input, select, textarea { font-family: inherit; }
 .field label { font-size: 12px; font-weight: 700; color: var(--encre-douce); text-transform: uppercase; letter-spacing: .03em; }
 
 .field input[type="text"],
-.field input[type="date"] {
+.field input[type="date"],
+.field input[type="number"] {
     height: 42px;
     padding: 0 14px;
     border: 2px solid var(--ligne);
@@ -487,10 +488,38 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
 .tagsElevesApc span { background: var(--bleu-pale); color: var(--bleu); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill); }
 .notesApc { color: var(--encre-douce); font-size: 13px; line-height: 1.4; }
 
-/* ---------- Pointage (placeholder) ---------- */
+/* ---------- Onglets en construction (placeholder) ---------- */
 .placeholderTab { text-align: center; padding: 60px 20px; color: var(--encre-douce); }
 .placeholderTab .emptyIcon { font-size: 44px; display: block; margin-bottom: 14px; }
 .placeholderTab h2 { color: var(--bleu); margin-bottom: 8px; }
+
+/* ---------- Pointage ---------- */
+.pointageOutils { background: var(--creme); border: 1px solid var(--ligne); border-radius: 16px; padding: 16px; margin-bottom: 20px; }
+.pointageOutils .formRow { margin-bottom: 12px; }
+.field input[type="number"] { min-width: 0; width: 110px; }
+.notePointage { background: var(--orange-tint); color: var(--orange); font-weight: 700; font-size: 13px; border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+.notePointage[hidden] { display: none; }
+.selectionPointage { margin-bottom: 14px; }
+.selectionPointage summary { cursor: pointer; font-weight: 800; font-size: 13px; color: var(--bleu); margin-bottom: 10px; }
+.actionsSelection { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.selectionPointage .checklistEleves { max-height: 200px; }
+
+.feuillePointage { background: var(--blanc); border: 1px solid var(--ligne); border-radius: 8px; box-shadow: var(--shadow); padding: 28px 32px; overflow-x: auto; }
+.enteteFeuille { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; border-bottom: 3px solid var(--bleu); padding-bottom: 8px; margin-bottom: 8px; }
+.enteteFeuille h2 { margin: 0; color: var(--bleu); font-size: 22px; }
+.dateFeuille { font-weight: 800; font-size: 15px; color: var(--encre); }
+.sousTitreFeuille { color: var(--encre-douce); font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.tablePointage { width: 100%; border-collapse: collapse; }
+.tablePointage th, .tablePointage td { border: 1px solid var(--encre-douce); padding: 0 8px; height: 34px; font-size: 13px; text-align: left; vertical-align: middle; }
+.tablePointage th { background: var(--bleu-pale); color: var(--bleu); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; font-weight: 800; height: 30px; }
+.tablePointage tr { break-inside: avoid; page-break-inside: avoid; }
+.tablePointage .colCase { width: 64px; text-align: center; }
+.tablePointage .colNom { width: 24%; font-weight: 700; }
+.tablePointage .colHeure { width: 14%; }
+.tablePointage .colMoyenne { width: 19%; }
+.tablePointage .colLarge { width: auto; }
+.caseCoche { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--encre); border-radius: 3px; vertical-align: middle; }
+.piedFeuille { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 30px; margin-top: 18px; font-size: 13px; font-weight: 700; color: var(--encre); }
 
 /* ---------- Modale ---------- */
 .modaleOverlay {
@@ -527,6 +556,10 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
 .appFooter { text-align: center; color: var(--encre-douce); font-size: 12px; padding: 6px 0 2px; }
 
 /* ---------- Responsive ---------- */
+@media screen and (max-width: 760px) {
+    .feuillePointage { padding: 16px; }
+    .tablePointage { min-width: 600px; }
+}
 @media (max-width: 760px) {
     .formRow { flex-direction: column; align-items: stretch; }
     .field.grow { flex: 1 1 auto; }
@@ -540,8 +573,12 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 680px; }
     .btnSupprimer, .softButton { display: none !important; }
     .app { max-width: 100%; gap: 0; }
     .card.contentCard { box-shadow: none; border: none; padding: 0; }
+    .feuillePointage { border: none; box-shadow: none; padding: 0; overflow: visible; }
+    .tablePointage th { background: transparent; color: #000; border-color: #000; }
+    .tablePointage td { border-color: #000; }
     .tabPanel { display: none !important; }
     .tabPanel.active { display: block !important; }
+    .impressionCiblee .tabPanel.active:not(.a-imprimer) { display: none !important; }
     .tabPanel.a-imprimer { display: block !important; }
     .tabPanel.sautDePage { break-before: page; page-break-before: always; }
 }
