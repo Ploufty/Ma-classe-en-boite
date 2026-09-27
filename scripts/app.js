@@ -443,7 +443,7 @@
                 (el.pai ? '<input type="text" class="editInput" style="margin-top:4px; min-width:140px;" data-id="' + el.id + '" data-field="paiDetail" value="' + escapeHtml(el.paiDetail || '') + '" placeholder="Précisions…">' : '') +
                 '</td>' +
                 '<td style="text-align:center;"><input type="checkbox" data-id="' + el.id + '" data-field="aesh"' + (el.aesh ? ' checked' : '') + '></td>' +
-                '<td class="no-print"><button type="button" class="btnSupprimer" data-id="' + el.id + '" title="Supprimer">✕</button></td>' +
+                '<td class="no-print"><button type="button" class="btnSupprimer" data-id="' + el.id + '" title="Supprimer" aria-label="Supprimer">✕</button></td>' +
                 '</tr>';
         }).join('');
 
@@ -637,7 +637,7 @@
         function etiquette(el, dansGroupe, couleur) {
             return '<li class="etiquetteEleve" draggable="true" data-id="' + el.id + '" style="border-left-color:' + (couleur || 'var(--bleu)') + ';">' +
                 '<span class="nomEleve">' + escapeHtml(nomComplet(el)) + '</span>' +
-                (dansGroupe ? '<button type="button" class="btnRetirer no-print" data-id="' + el.id + '" title="Retirer du groupe">✕</button>' : '') +
+                (dansGroupe ? '<button type="button" class="btnRetirer no-print" data-id="' + el.id + '" title="Retirer du groupe" aria-label="Retirer du groupe">✕</button>' : '') +
                 '</li>';
         }
 
@@ -650,11 +650,11 @@
             var couleur = couleurGroupe(i);
             return '<div class="zoneGroupe" data-groupe="' + (i + 1) + '">' +
                 '<div class="zoneGroupeTitre">' +
-                '<button type="button" class="pastilleCouleurGroupe no-print" data-groupe-index="' + i + '" style="background:' + couleur + ';" title="Changer la couleur du groupe"></button>' +
+                '<button type="button" class="pastilleCouleurGroupe no-print" data-groupe-index="' + i + '" style="background:' + couleur + ';" title="Changer la couleur du groupe" aria-label="Changer la couleur du groupe"></button>' +
                 '<span class="nomGroupe">' + escapeHtml(nomGroupe(i)) + '</span>' +
                 '<span class="compte">' + liste.length + '</span>' +
-                '<button type="button" class="btnRenommerGroupe no-print" data-groupe-index="' + i + '" title="Renommer le groupe">✎</button>' +
-                (nb > 1 ? '<button type="button" class="btnSupprimerGroupe no-print" data-groupe-index="' + i + '" title="Supprimer ce groupe">✕</button>' : '') +
+                '<button type="button" class="btnRenommerGroupe no-print" data-groupe-index="' + i + '" title="Renommer le groupe" aria-label="Renommer le groupe">✎</button>' +
+                (nb > 1 ? '<button type="button" class="btnSupprimerGroupe no-print" data-groupe-index="' + i + '" title="Supprimer ce groupe" aria-label="Supprimer ce groupe">✕</button>' : '') +
                 '</div>' +
                 '<ul style="list-style:none; margin:0; padding:0;">' + (liste.map(function (e) { return etiquette(e, true, couleur); }).join('') || '<li class="annivVide">Vide</li>') + '</ul>' +
                 '</div>';
@@ -717,7 +717,7 @@
                 var popover = document.createElement('div');
                 popover.className = 'popoverCouleurs';
                 popover.innerHTML = PALETTE_GROUPES.map(function (c) {
-                    return '<button type="button" style="background:' + c + ';" data-couleur="' + c + '"></button>';
+                    return '<button type="button" style="background:' + c + ';" data-couleur="' + c + '" aria-label="Couleur ' + c + '"></button>';
                 }).join('');
                 popover.querySelectorAll('button').forEach(function (b) {
                     b.addEventListener('click', function (ev) {
@@ -871,9 +871,9 @@
         var panel = $('panel-autres');
         var lignes = state.notes.map(function (note, i) {
             return '<div class="ligneNote">' +
-                '<button type="button" class="btnEmojiNote no-print" data-index="' + i + '" title="Choisir un emoji">' + (note.emoji || '➕') + '</button>' +
-                '<input type="text" class="editInput" data-index="' + i + '" data-champ="texte" value="' + escapeHtml(note.texte || '') + '" placeholder="Ex : Code photocopieuse : 1234">' +
-                '<button type="button" class="btnSupprimer" data-index="' + i + '" title="Supprimer cette ligne">✕</button>' +
+                '<button type="button" class="btnEmojiNote no-print" data-index="' + i + '" title="Choisir un emoji" aria-label="Choisir un emoji" aria-haspopup="true">' + (note.emoji || '➕') + '</button>' +
+                '<input type="text" class="editInput" aria-label="Information ' + (i + 1) + '" data-index="' + i + '" data-champ="texte" value="' + escapeHtml(note.texte || '') + '" placeholder="Ex : Code photocopieuse : 1234">' +
+                '<button type="button" class="btnSupprimer" data-index="' + i + '" title="Supprimer cette ligne" aria-label="Supprimer cette ligne">✕</button>' +
                 '</div>';
         }).join('') || '<div class="notesVide">Aucune ligne pour l\'instant. Ajoutez-en une ci-dessous.</div>';
 
@@ -956,7 +956,7 @@
             }).filter(Boolean);
             return '<div class="carteApc">' +
                 '<div class="enteteApc"><span class="dateApc">' + formatDateFR(s.date) + '</span>' +
-                '<button type="button" class="btnSupprimer no-print" data-id="' + s.id + '" title="Supprimer cette séance">✕</button></div>' +
+                '<button type="button" class="btnSupprimer no-print" data-id="' + s.id + '" title="Supprimer cette séance" aria-label="Supprimer cette séance">✕</button></div>' +
                 (s.domaine ? '<div class="domaineApc">' + escapeHtml(s.domaine) + '</div>' : '') +
                 '<div class="tagsElevesApc">' + noms.map(function (n) { return '<span>' + escapeHtml(n) + '</span>'; }).join('') + '</div>' +
                 (s.notes ? '<div class="notesApc">' + escapeHtml(s.notes) + '</div>' : '') +
