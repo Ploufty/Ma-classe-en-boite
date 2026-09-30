@@ -45,7 +45,8 @@
         couleursGroupes: [],
         notes: null,
         apcSeances: [],
-        pointage: Object.assign({}, POINTAGE_DEFAUT)
+        pointage: Object.assign({}, POINTAGE_DEFAUT),
+        plan: nouveauPlan()
     };
 
     function nouveauGarderieJours() {
@@ -169,7 +170,8 @@
                 couleursGroupes: state.couleursGroupes,
                 notes: state.notes,
                 apcSeances: state.apcSeances,
-                pointage: state.pointage
+                pointage: state.pointage,
+                plan: state.plan
             }));
         } catch (e) {}
     }
@@ -189,6 +191,7 @@
                 if (r.notes) state.notes = r.notes;
                 if (r.apcSeances) state.apcSeances = r.apcSeances;
                 if (r.pointage) state.pointage = Object.assign({}, state.pointage, r.pointage);
+                if (r.plan) state.plan = normaliserPlan(r.plan);
             }
         } catch (e) {}
         // Première utilisation : on amorce le pense-bête avec des exemples plutôt que de le laisser vide.
@@ -342,7 +345,7 @@
         document.querySelectorAll('.tabPanel').forEach(function (p) {
             p.classList.toggle('active', p.id === 'panel-' + tab);
         });
-        // Pointage a son propre bouton d'impression ; le plan de classe est encore en construction.
+        // Pointage et plan de classe ont leur propre bouton d'impression.
         $('barrePdfOnglet').style.display = (tab === 'pointage' || tab === 'plan') ? 'none' : '';
         render();
     }
@@ -1437,16 +1440,635 @@
     }
 
     // ---------- Vue Plan de classe ----------
+    // La salle est un repère logique de PLAN_LARGEUR unités de large (hauteur variable) : les tables y sont
+    // positionnées en unités puis affichées en pourcentages, si bien que le plan s'adapte à toute largeur d'écran.
+    // Deux modes : « Aménager la salle » (déplacer / pivoter / supprimer les tables) et « Placer les élèves »
+    // (glisser-déposer, ou clic sur un élève puis clic sur une place — ce qui fonctionne aussi au doigt et au clavier).
+
+    var PLAN_LARGEUR = 1000;
+    var PLAN_HAUTEUR_MIN = 640;
+    var PLAN_PAS = 10;                  // aimantation des déplacements
+    var LARGEUR_PLACE = 90, HAUTEUR_TABLE = 58;
+    var TAILLE_BUREAU = { w: 140, h: 60 };
+    var DISPOSITIONS = {
+        rangees: { label: 'Rangées de tables doubles', desc: '3 colonnes de tables à 2 places' },
+        ilots: { label: 'Îlots de 4', desc: '2 tables doubles face à face' },
+        u: { label: 'En U', desc: 'Tables individuelles autour d\'un espace central' },
+        simples: { label: 'Tables individuelles', desc: '5 colonnes de tables à 1 place' }
+    };
+
+    function nouveauPlan() {
+        return { tables: [], hauteur: PLAN_HAUTEUR_MIN, mode: 'amenager', affichage: 'prenom', mixte: true, vueEleves: false };
+    }
+
+    function normaliserPlan(p) {
+        var plan = Object.assign(nouveauPlan(), p && typeof p === 'object' ? p : {});
+        plan.tables = Array.isArray(plan.tables) ? plan.tables.filter(function (t) { return t && t.id; }) : [];
+        plan.tables.forEach(function (t) {
+            t.places = t.bureau ? 0 : Math.max(1, Math.min(2, t.places || 1));
+            t.eleves = Array.from({ length: t.places }, function (_, i) { return (t.eleves && t.eleves[i]) || null; });
+        });
+        return plan;
+    }
+
+    function tailleTable(t) {
+        var w = t.bureau ? TAILLE_BUREAU.w : LARGEUR_PLACE * t.places, h = t.bureau ? TAILLE_BUREAU.h : HAUTEUR_TABLE;
+        return t.vertical ? { w: h, h: w } : { w: w, h: h };
+    }
+
+    function nouvelleTable(x, y, places, vertical) {
+        return { id: uid(), x: x, y: y, places: places, vertical: !!vertical, eleves: Array.from({ length: places }, function () { return null; }) };
+    }
+
+    function nouveauBureau() {
+        return { id: uid(), bureau: true, x: PLAN_LARGEUR - TAILLE_BUREAU.w - 40, y: 14, places: 0, vertical: false, eleves: [] };
+    }
+
+    function ajusterHauteurPlan() {
+        var bas = state.plan.tables.reduce(function (m, t) { return Math.max(m, t.y + tailleTable(t).h); }, 0);
+        state.plan.hauteur = Math.max(PLAN_HAUTEUR_MIN, Math.ceil((bas + 40) / PLAN_PAS) * PLAN_PAS);
+    }
+
+    // Tables d'une disposition type pour n places (x centré dans la salle, première rangée sous le tableau).
+    function genererDisposition(cle, n) {
+        var tables = [], y0 = 110;
+        function grille(nbTables, cols, largeurTable, ecartX, pasY, fabrique) {
+            var x0 = (PLAN_LARGEUR - (cols * largeurTable + (cols - 1) * ecartX)) / 2;
+            for (var i = 0; i < nbTables; i++) fabrique(x0 + (i % cols) * (largeurTable + ecartX), y0 + Math.floor(i / cols) * pasY);
+        }
+        if (cle === 'rangees') {
+            grille(Math.ceil(n / 2), 3, 2 * LARGEUR_PLACE, 110, HAUTEUR_TABLE + 44, function (x, y) { tables.push(nouvelleTable(x, y, 2)); });
+        } else if (cle === 'ilots') {
+            var nbIlots = Math.ceil(n / 4);
+            grille(nbIlots, nbIlots <= 4 ? 2 : 3, 2 * LARGEUR_PLACE, 130, 2 * HAUTEUR_TABLE + 70, function (x, y) {
+                tables.push(nouvelleTable(x, y, 2), nouvelleTable(x, y + HAUTEUR_TABLE, 2));
+            });
+        } else if (cle === 'simples') {
+            grille(n, 5, LARGEUR_PLACE, 90, HAUTEUR_TABLE + 36, function (x, y) { tables.push(nouvelleTable(x, y, 1)); });
+        } else {
+            // En U : jusqu'à 20 tables individuelles sur le pourtour (ouverture vers le tableau),
+            // les élèves en surplus sur des tables doubles au centre.
+            var pas = LARGEUR_PLACE + 6, pasCote = HAUTEUR_TABLE + 8, pourtour = Math.min(n, 20);
+            var cote = Math.floor(pourtour / 3), fond = pourtour - 2 * cote;
+            var centre = n - pourtour, finCentre = y0 + 40;
+            grille(Math.ceil(centre / 2), 2, 2 * LARGEUR_PLACE, 60, HAUTEUR_TABLE + 40, function (x, y) {
+                tables.push(nouvelleTable(x, y + 60, 2));
+                finCentre = y + 60 + HAUTEUR_TABLE;
+            });
+            for (var i = 0; i < cote; i++) {
+                tables.push(nouvelleTable(40, y0 + 20 + i * pasCote, 1));
+                tables.push(nouvelleTable(PLAN_LARGEUR - 40 - LARGEUR_PLACE, y0 + 20 + i * pasCote, 1));
+            }
+            var yFond = Math.max(y0 + 20 + cote * pasCote + 10, finCentre + 40);
+            var xFond = (PLAN_LARGEUR - (fond * pas - 6)) / 2;
+            for (var j = 0; j < fond; j++) tables.push(nouvelleTable(xFond + j * pas, yFond, 1));
+        }
+        return tables;
+    }
+
+    function appliquerDisposition(cle) {
+        memoriserPlan();
+        var n = state.eleves.length || 24;
+        var bureau = state.plan.tables.filter(function (t) { return t.bureau; })[0] || nouveauBureau();
+        state.plan.tables = [bureau].concat(genererDisposition(cle, n));
+        state.plan.vueEleves = false;
+        ajusterHauteurPlan();
+        sauvegarder();
+        rafraichirPlan();
+    }
+
+    function chevauche(a, b, marge) {
+        var ta = tailleTable(a), tb = tailleTable(b);
+        return a.x < b.x + tb.w + marge && b.x < a.x + ta.w + marge && a.y < b.y + tb.h + marge && b.y < a.y + ta.h + marge;
+    }
+
+    // Ajoute une table au premier emplacement libre (sinon en bas de la salle, qui s'agrandit).
+    function ajouterTable(table) {
+        memoriserPlan();
+        var taille = tailleTable(table), trouve = false;
+        for (var y = 110; y + taille.h <= state.plan.hauteur - 20 && !trouve; y += 20) {
+            for (var x = 30; x + taille.w <= PLAN_LARGEUR - 30 && !trouve; x += 20) {
+                table.x = x; table.y = y;
+                trouve = !state.plan.tables.some(function (t) { return chevauche(table, t, 20); });
+            }
+        }
+        if (!trouve) { table.x = 30; table.y = state.plan.hauteur - 20; }
+        state.plan.tables.push(table);
+        ajusterHauteurPlan();
+        sauvegarder();
+        rafraichirPlan();
+        focusTable(table.id);
+    }
+
+    function trouverTable(id) { return state.plan.tables.find(function (t) { return t.id === id; }); }
+
+    function placeDe(eleveId) {
+        for (var i = 0; i < state.plan.tables.length; i++) {
+            var idx = state.plan.tables[i].eleves.indexOf(eleveId);
+            if (idx !== -1) return { table: state.plan.tables[i], index: idx };
+        }
+        return null;
+    }
+
+    function nbPlaces() { return state.plan.tables.reduce(function (s, t) { return s + t.places; }, 0); }
+
+    // Retire du plan les élèves supprimés de la liste (et les éventuels doublons).
+    function nettoyerPlan() {
+        var vus = {};
+        state.plan.tables.forEach(function (t) {
+            t.eleves = t.eleves.map(function (id) {
+                if (!id || vus[id] || !trouverEleve(id)) return null;
+                vus[id] = true;
+                return id;
+            });
+        });
+    }
+
+    // Prénom seul ; en cas de prénom partagé, on ajoute l'initiale du nom (ou le nom entier si l'initiale ne suffit pas).
+    function nomPlan(el) {
+        if (state.plan.affichage === 'prenomNom') return el.prenom + (el.nom ? ' ' + el.nom.toUpperCase() : '');
+        var cle = normaliserTexte(el.prenom), initiale = normaliserTexte(el.nom).charAt(0);
+        var homonymes = state.eleves.filter(function (e) { return e !== el && normaliserTexte(e.prenom) === cle; });
+        if (!homonymes.length || !el.nom) return el.prenom;
+        // Initiale du nom si elle suffit à distinguer, sinon le nom complet.
+        var memeInitiale = homonymes.some(function (e) { return normaliserTexte(e.nom).charAt(0) === initiale; });
+        return el.prenom + ' ' + (memeInitiale ? el.nom.toUpperCase() : el.nom.charAt(0).toUpperCase() + '.');
+    }
+
+    function melanger(tableau) {
+        var a = tableau.slice();
+        for (var i = a.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+        }
+        return a;
+    }
+
+    // Place au hasard les élèves pas encore placés sur les places libres.
+    // Mixité : à une table double, on privilégie un voisin de l'autre genre.
+    function placerRestants() {
+        var aPlacer = melanger(state.eleves.filter(function (el) { return !placeDe(el.id); }));
+        var tables = state.plan.tables.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+        tables.forEach(function (t) {
+            t.eleves.forEach(function (id, i) {
+                if (id || !aPlacer.length) return;
+                var k = 0;
+                if (state.plan.mixte) {
+                    var voisin = t.eleves.filter(function (v, j) { return v && j !== i; }).map(trouverEleve)[0];
+                    var reste = function (g) { return aPlacer.filter(function (el) { return (el.genre === 'M') === g; }).length; };
+                    // Avec un voisin : l'autre genre ; sinon le genre le plus nombreux restant, pour garder des paires mixtes.
+                    var garcon = voisin ? voisin.genre !== 'M' : reste(true) > reste(false);
+                    k = Math.max(0, aPlacer.findIndex(function (el) { return (el.genre === 'M') === garcon; }));
+                }
+                t.eleves[i] = aPlacer.splice(k, 1)[0].id;
+            });
+        });
+        return aPlacer.length; // élèves restés sans place
+    }
+
+    var planSelection = null;   // id de l'élève sélectionné (clic), en attente d'une place
+    var planMessage = '';       // information ponctuelle affichée sous la barre d'outils
+    var pilePlan = [];          // historique pour « Annuler »
+
+    function memoriserPlan() {
+        pilePlan.push(JSON.stringify(state.plan));
+        if (pilePlan.length > 40) pilePlan.shift();
+    }
+
+    function annulerPlan() {
+        if (!pilePlan.length) return;
+        state.plan = normaliserPlan(JSON.parse(pilePlan.pop()));
+        planSelection = null;
+        planMessage = '';
+        sauvegarder();
+        rafraichirPlan();
+    }
+
+    function placerEleve(eleveId, tableId, index) {
+        var table = trouverTable(tableId);
+        if (!table || !trouverEleve(eleveId)) return;
+        var origine = placeDe(eleveId);
+        if (origine && origine.table === table && origine.index === index) return;
+        memoriserPlan();
+        var occupant = table.eleves[index];
+        table.eleves[index] = eleveId;
+        // Échange : l'occupant prend l'ancienne place de l'élève déplacé (ou retourne dans la liste).
+        if (origine) origine.table.eleves[origine.index] = occupant || null;
+        planSelection = null;
+        planMessage = '';
+        sauvegarder();
+        rafraichirPlan();
+    }
+
+    function retirerEleve(eleveId) {
+        var origine = placeDe(eleveId);
+        if (!origine) return;
+        memoriserPlan();
+        origine.table.eleves[origine.index] = null;
+        if (planSelection === eleveId) planSelection = null;
+        sauvegarder();
+        rafraichirPlan();
+    }
+
+    // Coordonnées affichées : en « Vue élèves », la salle est retournée (tableau en bas), le texte reste lisible.
+    function positionAffichee(t) {
+        var taille = tailleTable(t);
+        var x = state.plan.vueEleves ? PLAN_LARGEUR - t.x - taille.w : t.x;
+        var y = state.plan.vueEleves ? state.plan.hauteur - t.y - taille.h : t.y;
+        return 'left:' + (x / PLAN_LARGEUR * 100) + '%;top:' + (y / state.plan.hauteur * 100) + '%;' +
+            'width:' + (taille.w / PLAN_LARGEUR * 100) + '%;height:' + (taille.h / state.plan.hauteur * 100) + '%;';
+    }
+
+    function htmlSiege(t, i) {
+        var id = t.eleves[i], el = id ? trouverEleve(id) : null;
+        var placement = state.plan.mode === 'placer';
+        var tab = placement ? '' : ' tabindex="-1"';
+        if (!el) {
+            return '<div class="planSiege vide" data-table="' + t.id + '" data-index="' + i + '">' +
+                '<button type="button" class="siegeNom"' + tab + ' aria-label="Place libre">' + (placement ? '<span aria-hidden="true">+</span>' : '') + '</button></div>';
+        }
+        var badges = state.plan.vueEleves ? '' : (el.aesh ? '<span class="siegeBadge no-print">AESH</span>' : '') + (el.pai ? '<span class="siegeBadge pai no-print">PAI</span>' : '');
+        return '<div class="planSiege occupe' + (el.genre === 'M' ? ' garcon' : ' fille') + (planSelection === id ? ' selectionne' : '') + '" data-table="' + t.id + '" data-index="' + i + '">' +
+            '<button type="button" class="siegeNom"' + tab + (placement ? ' draggable="true"' : '') + ' data-eleve="' + id + '" title="' + escapeHtml(el.prenom + ' ' + (el.nom || '').toUpperCase()) + '">' +
+            '<span class="siegeTexte">' + escapeHtml(nomPlan(el)) + '</span>' + badges + '</button>' +
+            (placement ? '<button type="button" class="siegeRetirer no-print" data-eleve="' + id + '" aria-label="Remettre ' + escapeHtml(el.prenom) + ' dans la liste" title="Remettre dans la liste">×</button>' : '') +
+            '</div>';
+    }
+
+    function htmlSalle() {
+        var p = state.plan;
+        if (!p.tables.length) {
+            return '<div class="planAccueil"><h3>Commencez par choisir une disposition</h3>' +
+                '<p>Elle est calculée pour vos ' + (state.eleves.length || 24) + ' élèves ; vous pourrez ensuite déplacer, ajouter ou supprimer des tables.</p>' +
+                '<div class="planAccueilChoix">' + Object.keys(DISPOSITIONS).map(function (cle) {
+                    return '<button type="button" class="planChoixDispo" data-dispo="' + cle + '">' + iconeDisposition(cle) +
+                        '<strong>' + DISPOSITIONS[cle].label + '</strong><small>' + DISPOSITIONS[cle].desc + '</small></button>';
+                }).join('') + '</div></div>';
+        }
+        var amenager = p.mode === 'amenager';
+        return '<div class="planTableau' + (p.vueEleves ? ' enBas' : '') + '">Tableau</div>' +
+            p.tables.map(function (t) {
+                var sieges = t.bureau ? '<span class="planBureauLabel">Bureau</span>' : t.eleves.map(function (_, i) { return htmlSiege(t, i); }).join('');
+                return '<div class="planTable' + (t.bureau ? ' bureau' : '') + (t.vertical ? ' vertical' : '') + '" data-table="' + t.id + '" style="' + positionAffichee(t) + '"' +
+                    (amenager ? ' tabindex="0" role="group" aria-label="' + (t.bureau ? 'Bureau' : 'Table ' + (t.places === 2 ? 'double' : 'individuelle')) + ' : glisser ou flèches du clavier pour déplacer, R pour pivoter, Suppr pour supprimer"' : '') + '>' +
+                    sieges +
+                    (amenager ? '<div class="planActions no-print">' +
+                        '<button type="button" class="btnPivoter" title="Pivoter" aria-label="Pivoter">⟳</button>' +
+                        '<button type="button" class="btnSupprimerTable" title="Supprimer" aria-label="Supprimer">✕</button></div>' : '') +
+                    '</div>';
+            }).join('');
+    }
+
+    function iconeDisposition(cle) {
+        var r = function (x, y, w, h) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1.5"/>'; };
+        var formes = {
+            rangees: [2, 20, 38].map(function (x) { return [8, 20, 32].map(function (y) { return r(x, y, 12, 6); }).join(''); }).join(''),
+            ilots: r(8, 10, 14, 7) + r(8, 17, 14, 7) + r(30, 10, 14, 7) + r(30, 17, 14, 7) + r(8, 30, 14, 7) + r(8, 37, 14, 7) + r(30, 30, 14, 7) + r(30, 37, 14, 7),
+            u: [10, 18, 26, 34].map(function (y) { return r(4, y, 5, 6) + r(43, y, 5, 6); }).join('') + [10, 18, 26, 34].map(function (x) { return r(x, 42, 7, 5); }).join(''),
+            simples: [3, 13, 23, 33, 43].map(function (x) { return [8, 20, 32].map(function (y) { return r(x, y, 7, 6); }).join(''); }).join('')
+        };
+        return '<svg class="iconeDispo" viewBox="0 0 52 50" aria-hidden="true"><rect x="16" y="1" width="20" height="3" rx="1" class="iconeTableau"/>' + formes[cle] + '</svg>';
+    }
+
+    function htmlListePlan() {
+        if (!state.eleves.length) return '<p class="planListeVide">Aucun élève : ajoutez-les avec le formulaire en haut de page ou importez une liste CSV.</p>';
+        var filtre = normaliserTexte(($('planRecherche') || {}).value || '');
+        var tries = state.eleves.slice().sort(function (a, b) { return a.prenom.localeCompare(b.prenom, 'fr', { sensitivity: 'base' }) || (a.nom || '').localeCompare(b.nom || '', 'fr'); })
+            .filter(function (el) { return !filtre || normaliserTexte(el.prenom + el.nom).indexOf(filtre) !== -1; });
+        var placement = state.plan.mode === 'placer';
+        function chip(el, place) {
+            return '<li><button type="button" class="chipEleve' + (el.genre === 'M' ? ' garcon' : ' fille') + (place ? ' place' : '') + (planSelection === el.id ? ' selectionne' : '') + '"' +
+                (placement ? ' draggable="true"' : ' disabled') + ' data-eleve="' + el.id + '" aria-pressed="' + (planSelection === el.id) + '">' +
+                '<span class="chipNom">' + escapeHtml(el.prenom) + ' <span class="chipNomFamille">' + escapeHtml((el.nom || '').toUpperCase()) + '</span></span>' +
+                (place ? '<span class="chipPlace" aria-label="placé">✓</span>' : '') + '</button></li>';
+        }
+        var nonPlaces = tries.filter(function (el) { return !placeDe(el.id); });
+        var places = tries.filter(function (el) { return placeDe(el.id); });
+        return '<h3 class="planListeTitre">À placer <span class="countBadge">' + nonPlaces.length + '</span></h3>' +
+            '<ul class="planChips">' + (nonPlaces.map(function (el) { return chip(el, false); }).join('') || '<li class="planListeVide">' + (filtre ? 'Aucun résultat' : 'Tous les élèves sont placés 🎉') + '</li>') + '</ul>' +
+            (places.length ? '<h3 class="planListeTitre">Déjà placés <span class="countBadge neutre">' + places.length + '</span></h3>' +
+                '<ul class="planChips">' + places.map(function (el) { return chip(el, true); }).join('') + '</ul>' : '');
+    }
+
+    function htmlOutilsPlan() {
+        var p = state.plan, places = nbPlaces(), n = state.eleves.length;
+        var capacite = '<span class="planCapacite' + (places < n ? ' manque' : '') + '">' + places + ' place' + (places > 1 ? 's' : '') + ' · ' + n + ' élève' + (n > 1 ? 's' : '') + '</span>';
+        if (p.mode === 'amenager') {
+            return '<div class="dropdown">' +
+                '<button type="button" class="softButton" id="btnMenuDispo" aria-haspopup="true" aria-expanded="false" aria-controls="menuDispo">🪑 Disposition type <span aria-hidden="true">▾</span></button>' +
+                '<div class="dropdownMenu" id="menuDispo" hidden>' + Object.keys(DISPOSITIONS).map(function (cle) {
+                    return '<button type="button" data-dispo="' + cle + '">' + iconeDisposition(cle) + '<span>' + DISPOSITIONS[cle].label + '</span></button>';
+                }).join('') + '</div></div>' +
+                '<button type="button" class="softButton" id="btnAjoutDouble">+ Table double</button>' +
+                '<button type="button" class="softButton" id="btnAjoutSimple">+ Table individuelle</button>' +
+                (p.tables.some(function (t) { return t.bureau; }) ? '' : '<button type="button" class="softButton" id="btnAjoutBureau">+ Bureau</button>') +
+                capacite;
+        }
+        return '<button type="button" class="softButton accent" id="btnPlacerRestants"' + (n ? '' : ' disabled') + '>🎲 Placer les élèves restants</button>' +
+            '<button type="button" class="softButton" id="btnNouveauTirage"' + (n ? '' : ' disabled') + '>🔀 Nouveau tirage complet</button>' +
+            '<label class="checkLabel"><input type="checkbox" id="chkMixte"' + (p.mixte ? ' checked' : '') + '> Alterner filles / garçons</label>' +
+            '<button type="button" class="softButton danger" id="btnViderPlacement">Tout remettre dans la liste</button>' +
+            capacite;
+    }
+
+    function messagePlan() {
+        if (planSelection) {
+            var el = trouverEleve(planSelection);
+            if (el) return '👉 <strong>' + escapeHtml(el.prenom) + '</strong> sélectionné(e) : cliquez sur une place (ou sur un autre élève pour échanger). Échap pour annuler.';
+        }
+        if (planMessage) return escapeHtml(planMessage);
+        if (!state.plan.tables.length) return '';
+        return state.plan.mode === 'amenager'
+            ? 'Glissez les tables pour les déplacer. Une fois la salle prête, passez à l\'étape « Placer les élèves ».'
+            : 'Glissez un prénom sur une place, ou cliquez sur l\'élève puis sur la place. Déposer sur un élève déjà assis les échange.';
+    }
+
+    // Met à jour tout le plan sauf le champ de recherche (qui garde le focus pendant la saisie).
+    function rafraichirPlan() {
+        if (!$('planSalle')) return;
+        nettoyerPlan();
+        var p = state.plan;
+        document.querySelectorAll('.planMode button').forEach(function (b) {
+            b.setAttribute('aria-pressed', b.dataset.mode === p.mode ? 'true' : 'false');
+        });
+        $('planOutils').innerHTML = htmlOutilsPlan();
+        if ($('btnMenuDispo')) initMenuDeroulant('btnMenuDispo', 'menuDispo');
+        $('planMessage').innerHTML = messagePlan();
+        planMessage = ''; // message ponctuel : affiché une seule fois
+        $('planMessage').hidden = !$('planMessage').innerHTML;
+        $('btnAnnulerPlan').disabled = !pilePlan.length;
+        $('btnVueEleves').setAttribute('aria-pressed', p.vueEleves ? 'true' : 'false');
+        $('planAffichage').value = p.affichage;
+        var salle = $('planSalle');
+        salle.className = 'planSalle mode-' + p.mode + (p.tables.length ? '' : ' vide') + (planSelection ? ' enSelection' : '');
+        salle.style.setProperty('--ratio', PLAN_LARGEUR + ' / ' + p.hauteur);
+        salle.style.setProperty('--ratio-num', PLAN_LARGEUR / p.hauteur);
+        salle.innerHTML = htmlSalle();
+        $('planListe').innerHTML = htmlListePlan();
+        $('planDateImpression').textContent = formatDateLongue(aujourdHuiISO());
+    }
+
+    function focusTable(id) {
+        var el = document.querySelector('.planTable[data-table="' + id + '"]');
+        if (el) el.focus();
+    }
 
     function renderPlanClasse() {
         var panel = $('panel-plan');
+        state.plan = normaliserPlan(state.plan);
+        if (!state.plan.tables.length) state.plan.mode = 'amenager';
         panel.innerHTML =
-            '<div class="placeholderTab">' +
-            '<span class="emptyIcon" aria-hidden="true">🗺️</span>' +
-            '<h2>Plan de classe</h2>' +
-            '<p>Cet onglet permettra bientôt de disposer les élèves de la liste sur un plan de classe (îlots, rangées…). En construction.</p>' +
-            '</div>';
+            '<div class="planBarre no-print">' +
+            '<div class="planMode" role="group" aria-label="Étape">' +
+            '<button type="button" data-mode="amenager"><span class="planModeNum">1</span> Aménager la salle</button>' +
+            '<button type="button" data-mode="placer"><span class="planModeNum">2</span> Placer les élèves</button>' +
+            '</div>' +
+            '<div class="planBarreDroite">' +
+            '<button type="button" class="softButton" id="btnAnnulerPlan" title="Annuler la dernière action (Ctrl+Z)">↶ Annuler</button>' +
+            '<button type="button" class="softButton" id="btnVueEleves" aria-pressed="false" title="Retourne le plan (tableau en bas) pour le projeter aux élèves">👁️ Vue élèves</button>' +
+            '<select id="planAffichage" class="selectNiveau" aria-label="Affichage des noms"><option value="prenom">Prénom</option><option value="prenomNom">Prénom NOM</option></select>' +
+            '<button type="button" class="softButton" id="btnImprimerPlan">🖨️ Imprimer / PDF</button>' +
+            '</div></div>' +
+            '<div class="planOutils no-print" id="planOutils"></div>' +
+            '<p class="planMessage no-print" id="planMessage" role="status" aria-live="polite"></p>' +
+            '<div class="planLayout">' +
+            '<aside class="planLateral no-print" aria-label="Élèves de la classe">' +
+            '<input type="search" id="planRecherche" class="planRecherche" placeholder="🔍 Rechercher un élève" aria-label="Rechercher un élève">' +
+            '<div id="planListe" class="planListe"></div>' +
+            '</aside>' +
+            '<div class="planZone">' +
+            '<div class="enteteFeuille print-only"><h2>Plan de classe</h2><div class="dateFeuille" id="planDateImpression"></div></div>' +
+            '<div id="planSalle" class="planSalle"></div>' +
+            '</div></div>';
+
+        panel.querySelector('.planMode').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-mode]');
+            if (!b || b.dataset.mode === state.plan.mode) return;
+            if (b.dataset.mode === 'placer' && !state.plan.tables.length) {
+                planMessage = 'Choisissez d\'abord une disposition de salle.';
+                rafraichirPlan();
+                return;
+            }
+            state.plan.mode = b.dataset.mode;
+            planSelection = null;
+            planMessage = '';
+            sauvegarder();
+            rafraichirPlan();
+        });
+        $('btnAnnulerPlan').addEventListener('click', annulerPlan);
+        $('btnVueEleves').addEventListener('click', function () {
+            state.plan.vueEleves = !state.plan.vueEleves;
+            sauvegarder();
+            rafraichirPlan();
+        });
+        $('planAffichage').addEventListener('change', function () {
+            state.plan.affichage = this.value;
+            sauvegarder();
+            rafraichirPlan();
+        });
+        $('btnImprimerPlan').addEventListener('click', function () { lancerImpressionSections(['plan']); });
+        $('planRecherche').addEventListener('input', function () { $('planListe').innerHTML = htmlListePlan(); });
+
+        $('planOutils').addEventListener('click', function (e) {
+            var dispo = e.target.closest('[data-dispo]');
+            if (dispo) { appliquerDisposition(dispo.dataset.dispo); return; }
+            var id = e.target.closest('button') && e.target.closest('button').id;
+            if (id === 'btnAjoutDouble') ajouterTable(nouvelleTable(0, 0, 2));
+            if (id === 'btnAjoutSimple') ajouterTable(nouvelleTable(0, 0, 1));
+            if (id === 'btnAjoutBureau') ajouterTable(Object.assign(nouveauBureau(), { x: 0, y: 0 }));
+            if (id === 'btnPlacerRestants' || id === 'btnNouveauTirage') {
+                memoriserPlan();
+                if (id === 'btnNouveauTirage') state.plan.tables.forEach(function (t) { t.eleves = t.eleves.map(function () { return null; }); });
+                var restants = placerRestants();
+                planSelection = null;
+                planMessage = restants ? restants + ' élève' + (restants > 1 ? 's n\'ont' : ' n\'a') + ' pas de place : ajoutez des tables à l\'étape 1.' : '';
+                sauvegarder();
+                rafraichirPlan();
+            }
+            if (id === 'btnViderPlacement') {
+                memoriserPlan();
+                state.plan.tables.forEach(function (t) { t.eleves = t.eleves.map(function () { return null; }); });
+                planSelection = null;
+                sauvegarder();
+                rafraichirPlan();
+            }
+        });
+        $('planOutils').addEventListener('change', function (e) {
+            if (e.target.id !== 'chkMixte') return;
+            state.plan.mixte = e.target.checked;
+            sauvegarder();
+        });
+
+        // --- Liste des élèves : sélection au clic, glisser vers une place, déposer ici pour retirer du plan ---
+        var liste = $('planListe'), salle = $('planSalle');
+        liste.addEventListener('click', function (e) {
+            var chip = e.target.closest('.chipEleve');
+            if (!chip) return;
+            var id = chip.dataset.eleve;
+            // Élève sélectionné puis clic sur un élève déjà placé : échange de places.
+            if (planSelection && planSelection !== id && placeDe(id)) {
+                var cible = placeDe(id);
+                placerEleve(planSelection, cible.table.id, cible.index);
+                return;
+            }
+            planSelection = planSelection === id ? null : id;
+            rafraichirPlan();
+        });
+        var dragId = null;
+        function debutGlisser(e) {
+            var src = e.target.closest('[data-eleve][draggable="true"]');
+            if (!src) return;
+            dragId = src.dataset.eleve;
+            e.dataTransfer.setData('text/plain', dragId);
+            e.dataTransfer.effectAllowed = 'move';
+            src.classList.add('glisse');
+        }
+        function finGlisser() {
+            dragId = null;
+            document.querySelectorAll('.glisse, .survol').forEach(function (el) { el.classList.remove('glisse', 'survol'); });
+        }
+        [liste, salle].forEach(function (zone) {
+            zone.addEventListener('dragstart', debutGlisser);
+            zone.addEventListener('dragend', finGlisser);
+        });
+        liste.addEventListener('dragover', function (e) { if (dragId && placeDe(dragId)) { e.preventDefault(); liste.classList.add('survol'); } });
+        liste.addEventListener('dragleave', function (e) { if (!liste.contains(e.relatedTarget)) liste.classList.remove('survol'); });
+        liste.addEventListener('drop', function (e) { e.preventDefault(); var id = dragId; finGlisser(); if (id) retirerEleve(id); });
+        salle.addEventListener('dragover', function (e) {
+            var siege = e.target.closest('.planSiege');
+            if (!dragId || !siege) return;
+            e.preventDefault();
+            document.querySelectorAll('.planSiege.survol').forEach(function (s) { if (s !== siege) s.classList.remove('survol'); });
+            siege.classList.add('survol');
+        });
+        salle.addEventListener('drop', function (e) {
+            var siege = e.target.closest('.planSiege'), id = dragId;
+            finGlisser();
+            if (!siege || !id) return;
+            e.preventDefault();
+            placerEleve(id, siege.dataset.table, parseInt(siege.dataset.index, 10));
+        });
+
+        // --- Salle : clics (placement, actions de table, choix de disposition) ---
+        salle.addEventListener('click', function (e) {
+            var dispo = e.target.closest('[data-dispo]');
+            if (dispo) { appliquerDisposition(dispo.dataset.dispo); return; }
+            var tableEl = e.target.closest('.planTable');
+            if (e.target.closest('.btnPivoter')) { pivoterTable(tableEl.dataset.table); return; }
+            if (e.target.closest('.btnSupprimerTable')) { supprimerTable(tableEl.dataset.table); return; }
+            if (state.plan.mode !== 'placer') return;
+            var retirer = e.target.closest('.siegeRetirer');
+            if (retirer) { retirerEleve(retirer.dataset.eleve); return; }
+            var siege = e.target.closest('.planSiege');
+            if (!siege) return;
+            var occupant = siege.querySelector('[data-eleve]');
+            if (planSelection) {
+                if (occupant && occupant.dataset.eleve === planSelection) planSelection = null;
+                else { placerEleve(planSelection, siege.dataset.table, parseInt(siege.dataset.index, 10)); return; }
+            } else if (occupant) {
+                planSelection = occupant.dataset.eleve;
+            } else {
+                planMessage = 'Sélectionnez d\'abord un élève dans la liste, puis cliquez sur cette place.';
+            }
+            rafraichirPlan();
+        });
+
+        // --- Déplacement des tables à la souris ou au doigt (mode Aménager) ---
+        var drag = null;
+        salle.addEventListener('pointerdown', function (e) {
+            if (state.plan.mode !== 'amenager' || e.button !== 0 || e.target.closest('.planActions')) return;
+            var el = e.target.closest('.planTable');
+            if (!el) return;
+            var t = trouverTable(el.dataset.table);
+            drag = { el: el, t: t, px: e.clientX, py: e.clientY, x: t.x, y: t.y, rect: salle.getBoundingClientRect(), bouge: false, avant: JSON.stringify(state.plan) };
+            el.setPointerCapture(e.pointerId);
+            el.classList.add('deplacement');
+        });
+        salle.addEventListener('pointermove', function (e) {
+            if (!drag) return;
+            var sens = state.plan.vueEleves ? -1 : 1, taille = tailleTable(drag.t);
+            var dx = (e.clientX - drag.px) / drag.rect.width * PLAN_LARGEUR * sens;
+            var dy = (e.clientY - drag.py) / drag.rect.height * state.plan.hauteur * sens;
+            if (Math.abs(e.clientX - drag.px) + Math.abs(e.clientY - drag.py) > 4) drag.bouge = true;
+            drag.t.x = Math.max(0, Math.min(PLAN_LARGEUR - taille.w, Math.round((drag.x + dx) / PLAN_PAS) * PLAN_PAS));
+            drag.t.y = Math.max(0, Math.min(state.plan.hauteur - taille.h, Math.round((drag.y + dy) / PLAN_PAS) * PLAN_PAS));
+            drag.el.style.cssText = positionAffichee(drag.t);
+        });
+        function finDeplacement() {
+            if (!drag) return;
+            var d = drag;
+            drag = null;
+            d.el.classList.remove('deplacement');
+            if (d.bouge) {
+                pilePlan.push(d.avant);
+                ajusterHauteurPlan();
+                sauvegarder();
+                rafraichirPlan();
+            }
+            focusTable(d.t.id);
+        }
+        salle.addEventListener('pointerup', finDeplacement);
+        salle.addEventListener('pointercancel', finDeplacement);
+
+        // --- Clavier sur une table (mode Aménager) : flèches, R, Suppr ---
+        salle.addEventListener('keydown', function (e) {
+            var el = e.target.closest('.planTable');
+            if (!el || e.target !== el || state.plan.mode !== 'amenager') return;
+            var t = trouverTable(el.dataset.table), pas = e.shiftKey ? 50 : PLAN_PAS, sens = state.plan.vueEleves ? -1 : 1;
+            var depl = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+            if (depl) {
+                e.preventDefault();
+                memoriserPlan();
+                var taille = tailleTable(t);
+                t.x = Math.max(0, Math.min(PLAN_LARGEUR - taille.w, t.x + depl[0] * pas * sens));
+                t.y = Math.max(0, t.y + depl[1] * pas * sens);
+                ajusterHauteurPlan();
+                sauvegarder();
+                rafraichirPlan();
+                focusTable(t.id);
+            } else if (e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                pivoterTable(t.id);
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                supprimerTable(t.id);
+            }
+        });
+
+        rafraichirPlan();
     }
+
+    // Pivote une table d'un quart de tour autour de son centre.
+    function pivoterTable(id) {
+        var t = trouverTable(id);
+        if (!t) return;
+        memoriserPlan();
+        var avant = tailleTable(t);
+        t.vertical = !t.vertical;
+        var apres = tailleTable(t);
+        t.x = Math.max(0, Math.min(PLAN_LARGEUR - apres.w, Math.round((t.x + (avant.w - apres.w) / 2) / PLAN_PAS) * PLAN_PAS));
+        t.y = Math.max(0, Math.round((t.y + (avant.h - apres.h) / 2) / PLAN_PAS) * PLAN_PAS);
+        ajusterHauteurPlan();
+        sauvegarder();
+        rafraichirPlan();
+        focusTable(id);
+    }
+
+    // Supprime une table : ses élèves retournent dans la liste (Annuler permet de revenir en arrière).
+    function supprimerTable(id) {
+        memoriserPlan();
+        state.plan.tables = state.plan.tables.filter(function (t) { return t.id !== id; });
+        planMessage = 'Table supprimée. « ↶ Annuler » pour la récupérer.';
+        sauvegarder();
+        rafraichirPlan();
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (state.activeTab !== 'plan' || modalRoot.innerHTML) return;
+        if (e.key === 'Escape' && planSelection) { planSelection = null; rafraichirPlan(); }
+        var saisie = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !saisie) { e.preventDefault(); annulerPlan(); }
+    });
 
     // ---------- CSV export / import ----------
     // Le mapping d'en-têtes ci-dessous est volontairement flexible (alias + comparaison
@@ -1592,7 +2214,8 @@
             couleursGroupes: state.couleursGroupes,
             notes: state.notes,
             apcSeances: state.apcSeances,
-            pointage: state.pointage
+            pointage: state.pointage,
+            plan: state.plan
         };
         telecharger(JSON.stringify(donnees, null, 2), 'application/json;charset=utf-8;', 'json');
     }
@@ -1609,6 +2232,8 @@
         state.notes = normaliserNotes(donnees.notes || EXEMPLES_NOTES.slice());
         state.apcSeances = donnees.apcSeances || [];
         state.pointage = Object.assign({}, POINTAGE_DEFAUT, donnees.pointage);
+        state.plan = normaliserPlan(donnees.plan);
+        pilePlan = [];
         pointageSelection = null;
         sauvegarder();
         render();
@@ -1674,7 +2299,8 @@
         { cle: 'cantine', label: 'Cantine / Garderie', rendu: renderCantine },
         { cle: 'autres', label: 'Informations (pense-bête)', rendu: renderAutres },
         { cle: 'apc', label: 'Suivi APC', rendu: renderApc },
-        { cle: 'pointage', label: 'Feuille de pointage', rendu: renderPointage }
+        { cle: 'pointage', label: 'Feuille de pointage', rendu: renderPointage },
+        { cle: 'plan', label: 'Plan de classe', rendu: renderPlanClasse }
     ];
 
     function showPrintOptions() {
@@ -1733,6 +2359,7 @@
             '      <h4>📝 Autres</h4><p>Un pense-bête libre pour vos informations pratiques, avec un emoji au choix par ligne pour vous repérer.</p>' +
             '      <h4>🎯 Suivi APC</h4><p>Enregistrez chaque séance avec sa date, son objectif et les élèves présents.</p>' +
             '      <h4>🖨️ Pointage / exportation PDF</h4><p>Choisissez le type de liste dans les sous-onglets (liste générale à colonnes vides, liste rapide en deux exemplaires, cantine, garderie matin et soir, APC, sortie / appel, ou liste personnalisée) et la date : la feuille se pré-remplit avec les élèves concernés. La liste personnalisée permet de cocher les colonnes à inclure (N°, case Présent, niveau, naissance, genre, cantine, garderie du jour, allergie / PAI, AESH, remarque), d\'imprimer en deux exemplaires et d\'ajouter une ligne vierge pour titrer les colonnes. Pour les listes générale, rapide et personnalisée, choisissez le nombre de colonnes à remplir et l\'orientation (portrait ou paysage). Réglez l\'affichage des noms (avec ou sans nom de famille), l\'ordre alphabétique (nom ou prénom) et la séparation par niveau. Ajustez la sélection si besoin, puis cliquez sur « Imprimer / enregistrer en PDF » (choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression).</p>' +
+            '      <h4>🗺️ Plan de classe</h4><p><strong>Étape 1 — Aménager la salle</strong> : choisissez une disposition type (rangées, îlots, U, tables individuelles), calculée pour le nombre d\'élèves de la liste. Glissez les tables pour les déplacer (ou sélectionnez-en une et utilisez les flèches du clavier), pivotez-les (⟳ ou touche R), supprimez-les (✕ ou Suppr), ajoutez des tables ou le bureau. <strong>Étape 2 — Placer les élèves</strong> : les prénoms viennent directement de la liste. Glissez un prénom sur une place, ou cliquez sur l\'élève puis sur la place (pratique sur tablette). Déposer un élève sur une place occupée échange les deux élèves ; la croix remet l\'élève dans la liste. « Placer les élèves restants » complète les places libres au hasard (en alternant filles et garçons si l\'option est cochée) sans toucher aux élèves déjà placés. « ↶ Annuler » (ou Ctrl+Z) revient en arrière. « Vue élèves » retourne le plan (tableau en bas) pour le projeter en classe. Deux élèves avec le même prénom sont distingués par l\'initiale de leur nom.</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
             '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +

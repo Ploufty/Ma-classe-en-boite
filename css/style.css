@@ -606,3 +606,158 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 44rem; }
     .tabPanel.a-imprimer { display: block !important; }
     .tabPanel.sautDePage { break-before: page; page-break-before: always; }
 }
+
+/* ---------- 23. PLAN DE CLASSE ---------- */
+.planBarre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .75rem; }
+.planMode { display: inline-flex; gap: .25rem; padding: .25rem; background: var(--surface-2); border: 1.5px solid var(--border); border-radius: 999px; }
+.planMode button {
+    display: inline-flex; align-items: center; gap: .5rem; min-height: var(--tap); padding: .3rem 1.1rem;
+    border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-weight: 700; font-size: .92rem; transition: var(--transition);
+}
+.planMode button:hover:not([aria-pressed="true"]) { background: var(--blue-soft); color: var(--blue); }
+.planMode button[aria-pressed="true"] { background: var(--blue); color: var(--on-accent); }
+.planModeNum { display: inline-flex; align-items: center; justify-content: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--surface); color: var(--blue); font-size: .8rem; }
+.planBarreDroite { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.planBarreDroite .selectNiveau { min-width: 0; }
+.softButton[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+.softButton.accent { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+.softButton.accent:hover { background: var(--blue-hover); }
+.planOutils {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .6rem;
+    padding: .6rem .75rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: .6rem;
+}
+.planOutils .dropdownMenu button svg { width: 2rem; height: 2rem; flex: none; }
+.planCapacite { margin-left: auto; font-size: .85rem; font-weight: 700; color: var(--green); background: var(--green-soft); padding: .3rem .8rem; border-radius: 999px; }
+.planCapacite.manque { color: var(--orange); background: var(--orange-soft); }
+.planMessage { margin: 0 0 .75rem; padding: .55rem .9rem; border-left: 4px solid var(--blue); background: var(--blue-soft); border-radius: .6rem; font-size: .9rem; }
+.planMessage[hidden] { display: none; }
+
+.planLayout { display: grid; grid-template-columns: 15.5rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+.planLateral { position: sticky; top: 4.5rem; display: flex; flex-direction: column; gap: .5rem; max-height: calc(100vh - 6rem); }
+.planRecherche { min-height: var(--tap); padding: .45rem .8rem; border: 1.5px solid var(--border); border-radius: .6rem; background: var(--surface); width: 100%; }
+.planRecherche:focus { outline: none; border-color: var(--blue); }
+.planListe { overflow-y: auto; padding: .25rem; border-radius: var(--radius); border: 2px dashed transparent; transition: border-color .2s, background-color .2s; }
+.planListe.survol { border-color: var(--blue); background: var(--blue-soft); }
+.planListeTitre { display: flex; align-items: center; justify-content: space-between; margin: .4rem 0; font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.planListeTitre .countBadge { min-height: 1.5rem; padding: 0 .6rem; }
+.countBadge.neutre { background: var(--surface-2); color: var(--muted); }
+.planListeVide { color: var(--muted); font-size: .9rem; padding: .4rem 0; }
+.planChips { list-style: none; margin: 0 0 .5rem; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+.chipEleve {
+    display: flex; align-items: center; gap: .4rem; width: 100%; min-height: 2.4rem; padding: .3rem .7rem; text-align: left;
+    background: var(--surface); border: 1.5px solid var(--border); border-left: 4px solid var(--red); border-radius: .6rem;
+    font-weight: 700; font-size: .92rem; cursor: grab; transition: var(--transition);
+}
+.chipEleve.garcon { border-left-color: var(--blue); }
+.chipEleve:hover:not([disabled]) { border-color: var(--blue); transform: translateX(2px); }
+.chipEleve[disabled] { cursor: default; opacity: .7; }
+.chipEleve.place { opacity: .6; font-weight: 500; }
+.chipEleve.selectionne { background: var(--blue); color: var(--on-accent); border-color: var(--blue); opacity: 1; box-shadow: 0 0 0 3px var(--blue-soft); }
+.chipEleve.glisse { opacity: .35; }
+.chipNom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chipNomFamille { font-weight: 500; font-size: .8em; opacity: .75; }
+.chipPlace { color: var(--green); font-weight: 700; }
+.chipEleve.selectionne .chipPlace { color: inherit; }
+
+/* La salle : repère proportionnel (--ratio), texte dimensionné sur sa largeur (unités cqw). */
+.planZone { min-width: 0; }
+.planSalle {
+    position: relative; width: 100%; aspect-ratio: var(--ratio, 1000 / 640); container-type: inline-size;
+    background-color: var(--surface-2);
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1.2px); background-size: 2% calc(2% * var(--ratio-num, 1.56));
+    border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; touch-action: pan-y;
+}
+.planSalle.vide { aspect-ratio: auto; background-image: none; }
+.planTableau {
+    position: absolute; left: 32%; width: 36%; top: 1.4%; padding: .5cqw 0; text-align: center;
+    background: #2f4f3a; color: #e8f3ea; border-radius: .6cqw; font-weight: 700; font-size: clamp(9px, 1.4cqw, 15px); letter-spacing: .3em; text-transform: uppercase;
+}
+.planTableau.enBas { top: auto; bottom: 1.4%; }
+.planTable {
+    position: absolute; display: flex; gap: .25cqw; padding: .3cqw;
+    background: #d9b98a; border: 1px solid #a88652; border-radius: .7cqw; box-shadow: 0 2px 4px rgba(0, 0, 0, .15);
+}
+[data-theme="dark"] .planTable { background: #8a6e46; border-color: #b59462; }
+.planTable.vertical { flex-direction: column; }
+.planTable.bureau { align-items: center; justify-content: center; background: #9aa7b8; border-color: #6c7a8d; }
+.planBureauLabel { font-weight: 700; font-size: clamp(8px, 1.3cqw, 14px); color: #1e1e2f; }
+.mode-amenager .planTable { cursor: grab; touch-action: none; }
+.mode-amenager .planTable:focus-visible, .mode-amenager .planTable.deplacement { outline: 3px solid var(--blue); outline-offset: 2px; z-index: 5; }
+.mode-amenager .planTable.deplacement { cursor: grabbing; box-shadow: var(--shadow-pop); }
+.mode-amenager .planSiege { pointer-events: none; }
+.planActions { position: absolute; top: -1.1cqw; right: -1.1cqw; display: flex; gap: .3cqw; z-index: 6; }
+.planActions button {
+    width: clamp(22px, 2.4cqw, 30px); height: clamp(22px, 2.4cqw, 30px); padding: 0; border-radius: 50%;
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-size: clamp(11px, 1.3cqw, 15px); line-height: 1; box-shadow: var(--shadow);
+}
+.planActions .btnSupprimerTable:hover { background: var(--red); color: #fff; border-color: var(--red); }
+.planActions .btnPivoter:hover { background: var(--blue); color: var(--on-accent); border-color: var(--blue); }
+
+.planSiege { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; border-radius: .5cqw; }
+.siegeNom {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 .3cqw;
+    background: #fffdf8; color: #1e1e2f; border: 1px solid #c9ad80; border-radius: .5cqw;
+    font-weight: 700; font-size: clamp(8px, 1.35cqw, 16px); line-height: 1.1; overflow: hidden; transition: var(--transition);
+}
+.planSiege.fille .siegeNom { box-shadow: inset 0 -.35cqw 0 #f6a6a0; }
+.planSiege.garcon .siegeNom { box-shadow: inset 0 -.35cqw 0 #a8c7fa; }
+.siegeTexte { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; }
+.planTable.vertical .siegeNom { font-size: clamp(7px, 1.05cqw, 13px); }
+.planZone .print-only { display: none; }
+.siegeBadge { font-size: .62em; font-weight: 700; color: var(--orange); background: var(--orange-soft); padding: 0 .3em; border-radius: .3em; margin-top: .15em; }
+.siegeBadge.pai { color: var(--red); background: var(--red-soft); }
+.planSiege.vide .siegeNom { background: rgba(255, 255, 255, .45); border-style: dashed; color: #8a7a60; font-size: clamp(10px, 1.8cqw, 20px); }
+.mode-placer .siegeNom { cursor: pointer; }
+.mode-placer .siegeNom[draggable="true"] { cursor: grab; }
+.mode-placer .siegeNom:hover { border-color: var(--blue); }
+.enSelection .planSiege.vide .siegeNom { background: #e3e3fd; border-color: #000091; color: #000091; }
+.planSiege.survol .siegeNom { background: #e3e3fd; border: 2px solid #000091; }
+.planSiege.selectionne .siegeNom { background: #000091; color: #fff; border-color: #000091; }
+.planSiege .glisse, .siegeNom.glisse { opacity: .35; }
+.siegeRetirer {
+    position: absolute; top: -.6cqw; right: -.6cqw; width: clamp(18px, 1.8cqw, 24px); height: clamp(18px, 1.8cqw, 24px); padding: 0;
+    border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: clamp(11px, 1.2cqw, 15px); line-height: 1;
+    opacity: 0; transition: opacity .15s; z-index: 4;
+}
+.planSiege:hover .siegeRetirer, .siegeRetirer:focus-visible { opacity: 1; }
+.siegeRetirer:hover { background: var(--red); color: #fff; border-color: var(--red); }
+@media (hover: none) { .siegeRetirer { opacity: 1; } }
+
+/* Premier écran : choix de la disposition */
+.planAccueil { padding: 2rem 1.25rem; text-align: center; }
+.planAccueil h3 { margin: 0 0 .3rem; color: var(--blue); }
+.planAccueil p { margin: 0 auto 1.25rem; max-width: 34rem; color: var(--muted); }
+.planAccueilChoix { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; max-width: 46rem; margin: 0 auto; }
+.planChoixDispo {
+    display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: 1rem .75rem;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); transition: var(--transition);
+}
+.planChoixDispo:hover { border-color: var(--blue); transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+.planChoixDispo strong { color: var(--blue); font-size: .95rem; }
+.planChoixDispo small { color: var(--muted); font-size: .8rem; }
+.iconeDispo { width: 4rem; height: 4rem; fill: var(--blue-soft); stroke: var(--blue); stroke-width: 1; }
+.iconeDispo .iconeTableau { fill: var(--green); stroke: none; }
+
+@media screen and (max-width: 48rem) {
+    .planLayout { grid-template-columns: 1fr; }
+    .planLateral { position: static; max-height: 14rem; }
+    /* Sur téléphone, le plan garde une taille lisible et défile horizontalement. */
+    .planZone { overflow-x: auto; }
+    .planSalle { min-width: 44rem; touch-action: pan-x pan-y; }
+    .planSalle.vide { min-width: 0; }
+    .planCapacite { margin-left: 0; }
+}
+
+@media print {
+    .planLayout { display: block; }
+    .planZone { page: paysage; }
+    .planSalle { width: min(100%, calc(175mm * var(--ratio-num, 1.56))); margin: 0 auto; background: #fff; border-color: #000; }
+    .planTable { background: #fff; border-color: #000; box-shadow: none; }
+    .siegeNom { border-color: #000; box-shadow: none !important; font-size: 1.5cqw; }
+    .planSiege.vide .siegeNom { background: #fff; }
+    .planSiege.vide .siegeNom span { visibility: hidden; }
+    .planTableau { background: #fff; color: #000; border: 2px solid #000; }
+    .planTable.bureau { background: #eee; }
+    .planZone .enteteFeuille.print-only { display: flex; }
+    .planSiege.selectionne .siegeNom { background: #fff; color: #000; }
+}
