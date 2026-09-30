@@ -635,7 +635,40 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 44rem; }
 }
 .planOutils .dropdownMenu button svg { width: 2rem; height: 2rem; flex: none; }
 .dropdownMenu.alignDroite { left: auto; right: 0; }
-.menuReglages { gap: .5rem; padding: .75rem .9rem; min-width: 17rem; }
+.menuReglages { display: flex; flex-direction: column; gap: .5rem; padding: .4rem .6rem .5rem; min-width: 17rem; }
+.dropdownMenu.menuReglages { padding: .75rem .9rem; }
+.menuDispo, .menuGenerer { min-width: 21rem; max-height: min(75vh, 40rem); overflow-y: auto; }
+.menuDispo button strong, .menuGenerer button strong { display: block; font-weight: 700; }
+.menuDispo button small, .menuGenerer button small { display: block; font-size: .78rem; color: var(--muted); font-weight: 500; }
+.menuSection { margin: .45rem .4rem .15rem; padding-top: .5rem; border-top: 1px solid var(--border); font-size: .75rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.menuVide { margin: .2rem .75rem .3rem; font-size: .85rem; color: var(--muted); }
+.menuModele { display: flex; align-items: center; gap: .2rem; }
+.menuModele button:first-child { flex: 1; }
+.dropdownMenu .menuModele .menuModeleSuppr { width: auto; flex: none; color: var(--muted); }
+.dropdownMenu .menuModele .menuModeleSuppr:hover { background: var(--red-soft); color: var(--red); }
+.menuCotes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3rem; padding: .2rem .4rem .4rem; }
+.dropdownMenu .menuCotes button { justify-content: center; padding: .4rem .3rem; border: 1.5px solid var(--border); font-weight: 700; }
+.dropdownMenu .menuCotes button[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+.planVerrou { font-size: .85rem; font-weight: 700; color: var(--muted); }
+.bilanPlan { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
+.bilanPlan li { display: flex; gap: .6rem; align-items: flex-start; padding: .5rem .75rem; border-radius: .6rem; background: var(--surface-2); font-size: .92rem; line-height: 1.4; }
+.bilanPlan li.alerte { background: var(--orange-soft); }
+
+/* Vue classe : plan en plein écran pour la projection */
+body.vueClasseOuverte { overflow: hidden; }
+.vueClasse { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; background: var(--bg); outline: none; }
+.vcBarre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .6rem 1rem; }
+.vcTitre { padding: .35rem .9rem; border: 1px solid var(--border); border-radius: .6rem; background: var(--surface); font-weight: 700; color: var(--blue); }
+.vcOptions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; padding: .3rem; border-radius: .8rem; background: var(--surface); box-shadow: var(--shadow); }
+.vcSegment { display: inline-flex; gap: 2px; padding: 2px; border-radius: .6rem; background: var(--surface-2); }
+.vcSegment button, .vcQuitter { min-height: 2.2rem; padding: .25rem .7rem; border: 0; border-radius: .5rem; background: transparent; color: var(--muted); font-weight: 700; font-size: .82rem; }
+.vcSegment button[aria-pressed="true"] { background: var(--blue); color: var(--on-accent); }
+.vcQuitter { border: 1.5px solid var(--border); background: var(--surface); color: var(--text); }
+.vcQuitter:hover { border-color: var(--red); color: var(--red); }
+.vcScene { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 1rem 1rem; }
+.vcScene .planSalle { width: min(100%, calc((100vh - 6rem) * var(--ratio-num, 1.56))); background-color: var(--surface); }
+.vcScene .siegeNom { font-size: clamp(9px, 1.6cqw, 30px); }
+@media print { .vueClasse { display: none !important; } }
 .menuReglages .softButton { width: 100%; }
 .reglage { display: flex; align-items: center; justify-content: space-between; gap: .6rem; font-size: .92rem; font-weight: 500; }
 .reglage .selectNiveau { min-width: 0; }
@@ -693,10 +726,22 @@ body.glisseEnCours, body.glisseEnCours * { cursor: grabbing !important; }
 }
 .planSalle.vide { aspect-ratio: auto; background-image: none; }
 .planTableau {
-    position: absolute; left: 32%; width: 36%; top: 1.4%; padding: .5cqw 0; text-align: center;
+    position: absolute; display: flex; align-items: center; justify-content: center;
     background: #2f4f3a; color: #e8f3ea; border-radius: .6cqw; font-weight: 700; font-size: clamp(9px, 1.4cqw, 15px); letter-spacing: .3em; text-transform: uppercase;
 }
-.planTableau.enBas { top: auto; bottom: 1.4%; }
+.planTableau.cote-haut, .planTableau.cote-bas { left: 32%; width: 36%; height: 3.4cqw; }
+.planTableau.cote-haut { top: 1.4%; }
+.planTableau.cote-bas { bottom: 1.4%; }
+.planTableau.cote-gauche, .planTableau.cote-droite { top: 30%; height: 40%; width: 3.4cqw; }
+.planTableau.cote-gauche { left: .9cqw; }
+.planTableau.cote-droite { right: .9cqw; }
+.planTableau.cote-gauche span { writing-mode: vertical-rl; transform: rotate(180deg); }
+.planTableau.cote-droite span { writing-mode: vertical-rl; }
+.numeroTable {
+    position: absolute; top: -.9cqw; left: -.9cqw; z-index: 3; display: flex; align-items: center; justify-content: center;
+    min-width: 2cqw; height: 2cqw; padding: 0 .3cqw; border-radius: 999px; background: #000091; color: #fff;
+    font-size: clamp(8px, 1.1cqw, 16px); font-weight: 700; line-height: 1;
+}
 .planTable {
     position: absolute; display: flex; gap: .25cqw; padding: .3cqw;
     background: #d9b98a; border: 1px solid #a88652; border-radius: .7cqw; box-shadow: 0 2px 4px rgba(0, 0, 0, .15);
