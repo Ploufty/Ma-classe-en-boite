@@ -48,7 +48,7 @@
         pointage: Object.assign({}, POINTAGE_DEFAUT)
     };
 
-    function nouveauGarderieJours() {
+    function nouvellesDemiJournees() {
         var j = {};
         JOURS_SEMAINE.forEach(function (jour) { j[jour.cle] = { matin: false, apresmidi: false }; });
         return j;
@@ -57,11 +57,11 @@
     function nouvelEleve(champs) {
         return Object.assign({
             id: uid(), nom: '', prenom: '', dateNaissance: '', genre: 'F', niveau: 'CP',
-            pai: false, paiDetail: '', aesh: false, aeshJours: nouveauGarderieJours(),
+            pai: false, paiDetail: '', aesh: false, aeshJours: nouvellesDemiJournees(),
             groupe: null,
             cantine: false, cantineSansViande: false, cantineSansPorc: false,
             allergie: '', remarque: '',
-            garderie: false, garderieJours: nouveauGarderieJours()
+            garderie: false, garderieJours: nouvellesDemiJournees()
         }, champs);
     }
 
@@ -71,7 +71,9 @@
 
     // Compatibilité : d'anciennes notes enregistrées comme simples chaînes deviennent des objets {emoji, texte}.
     function normaliserNotes(notes) {
-        return notes.map(function (n) { return typeof n === 'string' ? { emoji: '', texte: n } : n; });
+        return notes.map(function (n) {
+            return typeof n === 'string' ? { emoji: '', texte: n } : { emoji: chaine(n && n.emoji), texte: chaine(n && n.texte) };
+        });
     }
 
     function bornerLignesVides(v) {
@@ -84,6 +86,8 @@
     // ---------- Utilitaires ----------
 
     function $(id) { return document.getElementById(id); }
+
+    function chaine(v) { return typeof v === 'string' ? v : ''; }
 
     function uid() {
         return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -126,18 +130,21 @@
         return iso;
     }
 
-    // Convertit une date saisie/importée (yyyy-mm-dd ou dd/mm/yyyy) vers l'ISO yyyy-mm-dd utilisé en interne.
+    // Convertit une date saisie/importée (yyyy-mm-dd, avec ou sans heure, ou dd/mm/yyyy, dd.mm.yyyy, dd-mm-yyyy)
+    // vers l'ISO yyyy-mm-dd utilisé en interne ; tout autre format donne une date vide (elle est ensuite
+    // affichée telle quelle dans la page).
     function normaliserDateISO(texte) {
         if (!texte) return '';
         texte = texte.trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(texte)) return texte;
-        var m = texte.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        var iso = texte.match(/^(\d{4}-\d{2}-\d{2})(?:[T ][\d:.]+Z?)?$/);
+        if (iso) return iso[1];
+        var m = texte.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
         if (m) {
             var j = m[1].padStart(2, '0');
             var mo = m[2].padStart(2, '0');
             return m[3] + '-' + mo + '-' + j;
         }
-        return texte;
+        return '';
     }
 
     function dateVersObjet(iso) {
@@ -175,24 +182,48 @@
     }
 
     function charger() {
-        try {
-            var eleves = localStorage.getItem(STORAGE_ELEVES);
-            if (eleves) state.eleves = JSON.parse(eleves) || [];
-        } catch (e) {}
-        try {
-            var reglages = localStorage.getItem(STORAGE_REGLAGES);
-            if (reglages) {
-                var r = JSON.parse(reglages) || {};
-                if (r.nbGroupes) state.nbGroupes = r.nbGroupes;
-                if (r.nomsGroupes) state.nomsGroupes = r.nomsGroupes;
-                if (r.couleursGroupes) state.couleursGroupes = r.couleursGroupes;
-                if (r.notes) state.notes = r.notes;
-                if (r.apcSeances) state.apcSeances = r.apcSeances;
-                if (r.pointage) state.pointage = Object.assign({}, state.pointage, r.pointage);
-            }
-        } catch (e) {}
+        var donnees = {};
+        try { donnees = JSON.parse(localStorage.getItem(STORAGE_REGLAGES)) || {}; } catch (e) {}
+        try { donnees.eleves = JSON.parse(localStorage.getItem(STORAGE_ELEVES)); } catch (e) {}
+        appliquerDonnees(donnees);
+    }
+
+    // Point d'entrée unique des données chargées (navigateur ou fichier JSON importé). Les identifiants,
+    // dates et couleurs sont insérés tels quels dans le HTML : un fichier modifié à la main ou malveillant
+    // ne doit pas pouvoir y glisser du code.
+    var REGEX_ID = /^[A-Za-z0-9_-]+$/;
+    var REGEX_COULEUR = /^#[0-9A-Fa-f]{6}$/;
+
+    function assainirEleve(el) {
+        el = nouvelEleve(el && typeof el === 'object' ? el : {});
+        if (!REGEX_ID.test(el.id)) el.id = uid();
+        if (el.genre !== 'M') el.genre = 'F';
+        el.dateNaissance = normaliserDateISO(chaine(el.dateNaissance));
+        ['nom', 'prenom', 'niveau', 'paiDetail', 'allergie', 'remarque'].forEach(function (k) { el[k] = chaine(el[k]); });
+        ['garderieJours', 'aeshJours'].forEach(function (k) { if (!el[k] || typeof el[k] !== 'object') el[k] = nouvellesDemiJournees(); });
+        el.groupe = parseInt(el.groupe, 10) || null;
+        return el;
+    }
+
+    function assainirSeance(s) {
+        s = Object.assign({ domaine: '', notes: '' }, s);
+        if (!REGEX_ID.test(s.id)) s.id = uid();
+        s.date = normaliserDateISO(chaine(s.date));
+        if (!Array.isArray(s.eleveIds)) s.eleveIds = [];
+        return s;
+    }
+
+    function appliquerDonnees(d) {
+        function liste(v) { return Array.isArray(v) ? v : []; }
+        state.eleves = liste(d.eleves).map(assainirEleve);
+        state.nbGroupes = Math.max(1, Math.min(MAX_GROUPES, parseInt(d.nbGroupes, 10) || 4));
+        state.nomsGroupes = liste(d.nomsGroupes);
+        state.couleursGroupes = liste(d.couleursGroupes).map(function (c) { return REGEX_COULEUR.test(c) ? c : null; });
         // Première utilisation : on amorce le pense-bête avec des exemples plutôt que de le laisser vide.
-        state.notes = normaliserNotes(state.notes || EXEMPLES_NOTES.slice());
+        state.notes = normaliserNotes(Array.isArray(d.notes) ? d.notes : EXEMPLES_NOTES);
+        state.apcSeances = liste(d.apcSeances).map(assainirSeance);
+        state.pointage = Object.assign({}, POINTAGE_DEFAUT, d.pointage);
+        state.pointage.titre = chaine(state.pointage.titre);
     }
 
     // ---------- Modale (confirmation / saisie) ----------
@@ -430,7 +461,7 @@
             panel.innerHTML = elevesVides('Aucun élève enregistré. Ajoutez votre premier élève ci-dessus.');
             return;
         }
-        var lignes = elevesTries().map(function (el, i) {
+        var lignes = elevesTries().map(function (el) {
             return '<tr>' +
                 '<td><input type="text" class="editInput" data-id="' + el.id + '" data-field="nom" value="' + escapeHtml(el.nom || '') + '"></td>' +
                 '<td><input type="text" class="editInput" data-id="' + el.id + '" data-field="prenom" value="' + escapeHtml(el.prenom) + '"></td>' +
@@ -565,9 +596,9 @@
             return series.map(function (d, i) {
                 return '<div class="pyraMoisBarre">' +
                     '<div class="pyraMoisConteneur">' +
-                    '<div class="barreG" style="height:' + (d.M / max) * 100 + '%;' + styleBarre + '" title="' + titres[i] + ' : ' + d.M + ' garçon(s)"></div>' +
-                    '<div class="barreF" style="height:' + (d.F / max) * 100 + '%;' + styleBarre + '" title="' + titres[i] + ' : ' + d.F + ' fille(s)"></div>' +
-                    '</div><div class="pyraMoisLabel">' + labels[i] + '</div></div>';
+                    '<div class="barreG" style="height:' + (d.M / max) * 100 + '%;' + styleBarre + '" title="' + escapeHtml(titres[i]) + ' : ' + d.M + ' garçon(s)"></div>' +
+                    '<div class="barreF" style="height:' + (d.F / max) * 100 + '%;' + styleBarre + '" title="' + escapeHtml(titres[i]) + ' : ' + d.F + ' fille(s)"></div>' +
+                    '</div><div class="pyraMoisLabel">' + escapeHtml(labels[i]) + '</div></div>';
             }).join('');
         }
 
@@ -771,7 +802,11 @@
     function genererGroupesEquilibres() {
         var nb = state.nbGroupes;
         // Mélange aléatoire puis répartition tournante : donne des groupes de taille égale (à un près).
-        var melange = state.eleves.slice().sort(function () { return Math.random() - 0.5; });
+        var melange = state.eleves.slice();
+        for (var i = melange.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = melange[i]; melange[i] = melange[j]; melange[j] = tmp;
+        }
         melange.forEach(function (el, i) {
             el.groupe = (i % nb) + 1;
         });
@@ -789,7 +824,7 @@
         }
 
         function grilleJours(el, champ) {
-            var jours = el[champ] || nouveauGarderieJours();
+            var jours = el[champ] || nouvellesDemiJournees();
             var enTete = '<tr><th></th>' + JOURS_SEMAINE.map(function (j) { return '<th>' + j.label + '</th>'; }).join('') + '</tr>';
             function ligne(libelle, periode) {
                 return '<tr><td>' + libelle + '</td>' + JOURS_SEMAINE.map(function (j) {
@@ -860,7 +895,7 @@
                 var eleve = trouverEleve(cb.dataset.id);
                 if (!eleve) return;
                 var champ = cb.dataset.champ;
-                if (!eleve[champ]) eleve[champ] = nouveauGarderieJours();
+                if (!eleve[champ]) eleve[champ] = nouvellesDemiJournees();
                 eleve[champ][cb.dataset.jour][cb.dataset.periode] = cb.checked;
                 sauvegarder();
             });
@@ -873,7 +908,7 @@
         var panel = $('panel-autres');
         var lignes = state.notes.map(function (note, i) {
             return '<div class="ligneNote">' +
-                '<button type="button" class="btnEmojiNote no-print" data-index="' + i + '" title="Choisir un emoji" aria-label="Choisir un emoji" aria-haspopup="true">' + (note.emoji || '➕') + '</button>' +
+                '<button type="button" class="btnEmojiNote no-print" data-index="' + i + '" title="Choisir un emoji" aria-label="Choisir un emoji" aria-haspopup="true">' + (escapeHtml(note.emoji) || '➕') + '</button>' +
                 '<input type="text" class="editInput" aria-label="Information ' + (i + 1) + '" data-index="' + i + '" data-champ="texte" value="' + escapeHtml(note.texte || '') + '" placeholder="Ex : Code photocopieuse : 1234">' +
                 '<button type="button" class="btnSupprimer" data-index="' + i + '" title="Supprimer cette ligne" aria-label="Supprimer cette ligne">✕</button>' +
                 '</div>';
@@ -884,7 +919,7 @@
             '<p class="autresIntro no-print">Notez ici vos codes ou informations diverses de la classe (une ligne par information, avec un emoji au choix pour vous repérer), à consulter ou imprimer à tout moment.</p>' +
             '<div class="boiteNotes no-print">' + lignes + '</div>' +
             '<ul class="notesImpression print-only">' + state.notes.filter(function (n) { return (n.texte || '').trim(); }).map(function (n) {
-                return '<li>' + (n.emoji ? n.emoji + ' ' : '') + escapeHtml(n.texte) + '</li>';
+                return '<li>' + (n.emoji ? escapeHtml(n.emoji) + ' ' : '') + escapeHtml(n.texte) + '</li>';
             }).join('') + '</ul>' +
             '<button type="button" id="btnAjouterNote" class="softButton btnAjouterNote no-print">+ Ajouter une ligne</button>';
 
@@ -1383,11 +1418,11 @@
             optionAffichage('pointageOrientation', 'orientation', function (e) { return e.value; });
         }
         if (p.type === 'perso') {
-            function majPerso(changement) {
+            var majPerso = function (changement) {
                 state.pointage.perso = Object.assign(optionsPerso(), changement);
                 sauvegarder();
                 rafraichirFeuillePointage();
-            }
+            };
             $('persoColonnes').addEventListener('change', function () {
                 majPerso({ colonnes: [...panel.querySelectorAll('#persoColonnes input:checked')].map(function (cb) { return cb.value; }) });
             });
@@ -1475,7 +1510,11 @@
             lignes.push([
                 el.nom || '', el.prenom, el.genre, formatDateFR(el.dateNaissance), el.niveau,
                 el.pai ? 'Oui' : 'Non', el.aesh ? 'Oui' : 'Non'
-            ].map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
+            ].map(function (v) {
+                v = String(v);
+                if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; // sinon Excel l'interpréterait comme une formule
+                return '"' + v.replace(/"/g, '""') + '"';
+            }).join(';'));
         });
         telecharger('﻿' + lignes.join('\n'), 'text/csv;charset=utf-8;', 'csv');
     }
@@ -1598,17 +1637,7 @@
     }
 
     function chargerDonneesJSON(donnees) {
-        state.eleves = Array.isArray(donnees.eleves) ? donnees.eleves : [];
-        state.eleves.forEach(function (el) {
-            if (!el.id) el.id = uid();
-            if (!el.garderieJours) el.garderieJours = nouveauGarderieJours();
-        });
-        state.nbGroupes = donnees.nbGroupes || 4;
-        state.nomsGroupes = donnees.nomsGroupes || [];
-        state.couleursGroupes = donnees.couleursGroupes || [];
-        state.notes = normaliserNotes(donnees.notes || EXEMPLES_NOTES.slice());
-        state.apcSeances = donnees.apcSeances || [];
-        state.pointage = Object.assign({}, POINTAGE_DEFAUT, donnees.pointage);
+        appliquerDonnees(donnees);
         pointageSelection = null;
         sauvegarder();
         render();
@@ -1750,12 +1779,10 @@
     // ---------- Effacement ----------
 
     $('btnClearAll').addEventListener('click', function () {
-        if (state.eleves.length === 0) return;
-        showConfirm('Tout effacer', 'Voulez-vous vraiment supprimer tous les élèves et réinitialiser les groupes ? Le pense-bête (onglet Autres) est conservé.', function () {
-            state.eleves = [];
-            state.nbGroupes = 4;
-            state.nomsGroupes = [];
-            state.couleursGroupes = [];
+        // Retour à l'état d'une première utilisation : rien ne doit rester sur un ordinateur partagé.
+        showConfirm('Tout effacer', 'Voulez-vous vraiment tout effacer de ce navigateur : élèves, groupes, pense-bête, séances d\'APC et réglages de pointage ? Pensez à enregistrer la classe (Sauvegarde) avant.', function () {
+            appliquerDonnees({});
+            pointageSelection = null;
             sauvegarder();
             render();
         });
