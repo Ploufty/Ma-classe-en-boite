@@ -1777,12 +1777,10 @@
     // ---------- Effacement ----------
 
     $('btnClearAll').addEventListener('click', function () {
-        if (state.eleves.length === 0) return;
-        showConfirm('Tout effacer', 'Voulez-vous vraiment supprimer tous les élèves et réinitialiser les groupes ? Le pense-bête (onglet Autres) est conservé.', function () {
-            state.eleves = [];
-            state.nbGroupes = 4;
-            state.nomsGroupes = [];
-            state.couleursGroupes = [];
+        // Retour à l'état d'une première utilisation : rien ne doit rester sur un ordinateur partagé.
+        showConfirm('Tout effacer', 'Voulez-vous vraiment tout effacer de ce navigateur : élèves, groupes, pense-bête, séances d\'APC et réglages de pointage ? Pensez à enregistrer la classe (Sauvegarde) avant.', function () {
+            appliquerDonnees({});
+            pointageSelection = null;
             sauvegarder();
             render();
         });
