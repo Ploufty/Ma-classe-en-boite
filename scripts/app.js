@@ -130,13 +130,15 @@
         return iso;
     }
 
-    // Convertit une date saisie/importée (yyyy-mm-dd ou dd/mm/yyyy) vers l'ISO yyyy-mm-dd utilisé en interne ;
-    // tout autre format donne une date vide (elle est ensuite affichée telle quelle dans la page).
+    // Convertit une date saisie/importée (yyyy-mm-dd, avec ou sans heure, ou dd/mm/yyyy, dd.mm.yyyy, dd-mm-yyyy)
+    // vers l'ISO yyyy-mm-dd utilisé en interne ; tout autre format donne une date vide (elle est ensuite
+    // affichée telle quelle dans la page).
     function normaliserDateISO(texte) {
         if (!texte) return '';
         texte = texte.trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(texte)) return texte;
-        var m = texte.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        var iso = texte.match(/^(\d{4}-\d{2}-\d{2})(?:[T ][\d:.]+Z?)?$/);
+        if (iso) return iso[1];
+        var m = texte.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
         if (m) {
             var j = m[1].padStart(2, '0');
             var mo = m[2].padStart(2, '0');
