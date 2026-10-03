@@ -88,6 +88,13 @@ button[disabled] { opacity: .45; cursor: not-allowed; transform: none !important
 }
 .icon-btn:hover { border-color: var(--blue); transform: translateY(-2px); }
 .icon-btn svg { width: 1.2rem; height: 1.2rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.docBtn {
+    display: inline-flex; align-items: center; gap: .4rem; min-height: var(--tap); padding: 0 1rem;
+    color: var(--blue); background: var(--blue-soft); border: 1.5px solid var(--blue); border-radius: 999px;
+    font-size: .9rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+    transition: border-color .25s, transform .25s var(--spring);
+}
+.docBtn:hover { transform: translateY(-2px); }
 .i-sun, [data-theme="dark"] .i-moon { display: none; }
 [data-theme="dark"] .i-sun { display: block; }
 .hero { padding-block: 1.6rem 1.4rem; }
@@ -142,12 +149,12 @@ button[disabled] { opacity: .45; cursor: not-allowed; transform: none !important
     padding: .4rem; box-shadow: var(--shadow-pop);
 }
 .dropdownMenu[hidden] { display: none !important; }
-.dropdownMenu button {
-    display: flex; align-items: center; gap: .5rem; width: 100%; min-height: var(--tap); text-align: left;
+.dropdownMenu button, .dropdownMenu a {
+    display: flex; text-decoration: none; align-items: center; gap: .5rem; width: 100%; min-height: var(--tap); text-align: left;
     border: none; background: transparent; color: var(--text); font-weight: 500; font-size: .9rem;
     padding: .5rem .75rem; border-radius: .6rem; transition: var(--transition);
 }
-.dropdownMenu button:hover { background: var(--blue-soft); color: var(--blue); }
+.dropdownMenu button:hover, .dropdownMenu a:hover { background: var(--blue-soft); color: var(--blue); }
 
 /* ---------- 6. CARTES ET ÉTAPE REPLIABLE ---------- */
 .card, .step {
@@ -563,6 +570,8 @@ table.listeTable { width: 100%; border-collapse: collapse; min-width: 44rem; }
 }
 @media (max-width: 34rem) {
     .brand small { display: none; }
+    .docBtn { padding: 0; width: var(--tap); justify-content: center; }
+    .docBtn .docBtnTexte { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     .toolbar > .dropdown, .toolbar > .softButton { flex: 1 1 calc(50% - .5rem); }
     .toolbar .dropdown > .softButton { width: 100%; }
     .card, .step-body { padding: 1rem; }
@@ -870,3 +879,41 @@ body.glisseEnCours, body.glisseEnCours * { cursor: grabbing !important; }
     .planImpression .planSiege.vide .siegeNom { background: #fff; border-style: solid; }
 }
 .planTable.actionsDessous .planActions { bottom: auto; top: calc(100% + 6px); }
+
+/* ---------- 22. PAGE « MODE D'EMPLOI » (aide.html) ---------- */
+.doc h2 { margin: 0 0 .8rem; color: var(--blue); font-size: 1.35rem; }
+.doc h3 { margin: 1.4rem 0 .5rem; font-size: 1.05rem; }
+.doc p, .doc li, .doc dd { line-height: 1.6; }
+.doc ul, .doc ol { padding-left: 1.4rem; }
+.doc li + li { margin-top: .3rem; }
+.doc code { font-size: .9em; padding: .05rem .35rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: .35rem; }
+.docSommaire, .docSection { padding: 1.5rem; scroll-margin-top: 1rem; }
+.docSommaire ol { margin: 0; columns: 2 18rem; column-gap: 2rem; }
+.docSommaire li { break-inside: avoid; }
+.docDefs dt { margin-top: .9rem; font-weight: 700; }
+.docDefs dd { margin: .2rem 0 0 1.4rem; }
+.docNote, .docAttention { padding: .75rem 1rem; border-radius: .7rem; background: var(--blue-soft); }
+.docAttention { background: var(--orange-soft); border-left: 4px solid var(--orange); }
+.docTable { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.docTable th, .docTable td { padding: .55rem .7rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.docTable th { background: var(--surface-2); }
+.docTableau td, .docTableau th { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: .85rem; }
+.docCode { margin: 0; padding: 1rem; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--border); border-radius: .7rem; font-size: .85rem; line-height: 1.6; }
+.docCode code { padding: 0; border: 0; background: none; }
+.docTelechargement {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1rem 1.2rem; margin-bottom: .5rem; background: var(--blue-soft); border: 1.5px solid var(--blue); border-radius: var(--radius);
+}
+.docTelechargement > div { flex: 1 1 18rem; }
+.docTelechargement p { margin: .3rem 0 0; }
+.docTelechargement .primaryButton { text-decoration: none; }
+.doc details { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.doc summary { cursor: pointer; font-weight: 700; }
+.doc details p { margin: .5rem 0 0; }
+.docRetour { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.docRetour .softButton { text-decoration: none; }
+@media print {
+    .doc .docSommaire, .docRetour, .docTelechargement { display: none !important; }
+    .doc details > p { display: block; }
+    .docSection { break-inside: auto; box-shadow: none; }
+}

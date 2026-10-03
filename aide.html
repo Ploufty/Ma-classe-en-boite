@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mode d'emploi — Ma Classe en Boîte</title>
+    <meta name="description" content="Documentation complète de Ma Classe en Boîte : fonctionnalités, conseils d'usage et format du fichier CSV à importer.">
+    <meta name="theme-color" content="#000091">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="scripts/theme.js"></script>
+</head>
+<body>
+
+    <header class="outil-header">
+        <div class="container brandbar">
+            <a class="brand" href="index.html" aria-label="Retour à Ma Classe en Boîte">
+                <span class="back" aria-hidden="true">←</span>
+                <span><b>Ma Classe <span>en Boîte</span></b><small>Retour à l'outil</small></span>
+            </a>
+            <div class="actions">
+                <button type="button" class="icon-btn" id="theme-toggle" aria-label="Activer le mode sombre">
+                    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="container hero">
+            <h1>Mode d'emploi <span class="accent">Ma Classe en Boîte</span></h1>
+            <p>Toutes les fonctionnalités, des conseils d'usage et le format du fichier CSV à importer</p>
+        </div>
+        <div class="tricolore" aria-hidden="true"></div>
+    </header>
+
+    <main class="container doc">
+
+        <nav class="card docSommaire" aria-labelledby="titreSommaire">
+            <h2 id="titreSommaire">Sommaire</h2>
+            <ol>
+                <li><a href="#demarrer">Démarrer en 5 minutes</a></li>
+                <li><a href="#donnees">Où sont mes données ? Sauvegarde et confidentialité</a></li>
+                <li><a href="#barre">La barre d'outils</a></li>
+                <li><a href="#ajout">Ajouter et modifier un élève</a></li>
+                <li><a href="#onglets">Les onglets, un par un</a></li>
+                <li><a href="#csv"><strong>Importer une liste CSV : format attendu et modèle vierge</strong></a></li>
+                <li><a href="#impression">Imprimer et exporter en PDF</a></li>
+                <li><a href="#affichage">Affichage et accessibilité</a></li>
+                <li><a href="#faq">Questions fréquentes</a></li>
+            </ol>
+        </nav>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="demarrer" aria-labelledby="t-demarrer">
+            <h2 id="t-demarrer">1. Démarrer en 5 minutes</h2>
+            <ol class="etapes">
+                <li><strong>Remplissez la liste des élèves</strong> : soit un par un avec le formulaire « Ajouter un élève », soit d'un coup avec <em>📄 Import / export CSV → Importer une liste CSV</em> (voir <a href="#csv">le format attendu</a>).</li>
+                <li><strong>Vérifiez la liste</strong> dans l'onglet 📋 Liste : chaque case se corrige directement.</li>
+                <li><strong>Complétez ce qui vous sert</strong> : cantine et garderie, groupes, plan de classe, pense-bête…</li>
+                <li><strong>Enregistrez la classe</strong> avec <em>💾 Sauvegarde → Enregistrer la classe (JSON)</em>. Gardez ce fichier : il permet de tout retrouver plus tard ou sur un autre ordinateur.</li>
+                <li><strong>Imprimez</strong> vos feuilles d'appel, de cantine ou de sortie depuis l'onglet 🖨️ Pointage.</li>
+            </ol>
+            <p class="docNote">💡 Aucun compte, aucune installation : l'outil fonctionne entièrement dans votre navigateur.</p>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="donnees" aria-labelledby="t-donnees">
+            <h2 id="t-donnees">2. Où sont mes données ? Sauvegarde et confidentialité</h2>
+            <p>Les informations saisies <strong>ne quittent jamais votre ordinateur</strong> : elles ne sont envoyées à aucun serveur. Elles sont conservées dans la mémoire du navigateur utilisé, ce qui a deux conséquences :</p>
+            <ul>
+                <li>en rouvrant l'outil <strong>sur le même ordinateur et le même navigateur</strong>, vous retrouvez votre classe telle que vous l'avez laissée ;</li>
+                <li>sur un <strong>autre ordinateur</strong>, un autre navigateur, en navigation privée ou après un nettoyage de l'historique, la classe n'apparaît pas : il faut la recharger depuis votre fichier de sauvegarde.</li>
+            </ul>
+            <h3>Les deux façons d'enregistrer</h3>
+            <div class="tableWrap">
+                <table class="docTable">
+                    <thead><tr><th>Format</th><th>Ce qui est conservé</th><th>À utiliser pour…</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>JSON</strong><br><small>💾 Sauvegarde</small></td><td>Absolument tout : élèves, cantine, garderie, AESH, groupes et leurs couleurs, pense-bête, séances d'APC, réglages de pointage, plan de classe.</td><td>Reprendre son travail plus tard ou sur un autre appareil. <strong>C'est la vraie sauvegarde.</strong></td></tr>
+                        <tr><td><strong>CSV</strong><br><small>📄 Import / export CSV</small></td><td>Seulement la liste : nom, prénom, genre, date de naissance, niveau, PAI, AESH.</td><td>Échanger une liste avec un tableur (Excel, LibreOffice) ou importer un export ONDE.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <h3>Sur un ordinateur partagé</h3>
+            <p>En fin de séance : <em>💾 Sauvegarde → Enregistrer la classe (JSON)</em>, puis <em>🗑️ Tout effacer</em>. Rien ne reste alors sur le poste. La prochaine fois, <em>💾 Sauvegarde → Reprendre une classe (JSON)</em>.</p>
+            <p class="docAttention">⚠️ Le fichier JSON contient des données personnelles d'élèves (noms, dates de naissance, PAI…). Rangez-le dans un espace sûr (clé personnelle, espace de stockage professionnel) et ne le diffusez pas.</p>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="barre" aria-labelledby="t-barre">
+            <h2 id="t-barre">3. La barre d'outils</h2>
+            <dl class="docDefs">
+                <dt>📄 Import / export CSV</dt>
+                <dd><strong>Importer une liste CSV</strong> ajoute les élèves du fichier <em>à la suite</em> de ceux déjà présents (rien n'est remplacé). <strong>Exporter la liste en CSV</strong> télécharge la liste actuelle, lisible par un tableur. Le menu donne aussi accès au <a href="#csv">format attendu</a> et au modèle vierge.</dd>
+                <dt>💾 Sauvegarde</dt>
+                <dd><strong>Enregistrer la classe</strong> télécharge un fichier <code>classe_AAAA-MM-JJ.json</code>. <strong>Reprendre une classe</strong> recharge un tel fichier ; une confirmation est demandée car la classe affichée est <em>remplacée</em>.</dd>
+                <dt>🖨️ Imprimer</dt>
+                <dd>Choisissez une ou plusieurs sections (liste, pyramide, groupes, pointage, plan…) ; chacune est imprimée sur sa propre page.</dd>
+                <dt>🗑️ Tout effacer</dt>
+                <dd>Remet l'outil à zéro dans ce navigateur : élèves, groupes, pense-bête, APC, plan et réglages. Pensez à enregistrer avant !</dd>
+                <dt>📖 Mode d'emploi, ❓ aide rapide, 🌙 thème</dt>
+                <dd>En haut à droite : cette documentation, un aide-mémoire en fenêtre et le passage en mode sombre.</dd>
+            </dl>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="ajout" aria-labelledby="t-ajout">
+            <h2 id="t-ajout">4. Ajouter et modifier un élève</h2>
+            <p>Le bloc « Ajouter un élève » (repliable en cliquant sur son titre) contient :</p>
+            <ul>
+                <li><strong>Nom</strong> (facultatif) et <strong>Prénom</strong> (obligatoire) ;</li>
+                <li><strong>Date de naissance</strong> (obligatoire) : elle alimente la pyramide des âges et les anniversaires ;</li>
+                <li><strong>Genre</strong> : Fille ou Garçon ;</li>
+                <li><strong>Niveau de classe</strong> : PS à CM2, ou <em>Autre…</em> pour saisir un niveau libre (ULIS, UPE2A, TPS…) ;</li>
+                <li><strong>PAI</strong> : une fois cochée, une zone permet de préciser le protocole (allergie, traitement…) ;</li>
+                <li><strong>AESH</strong> : les demi-journées d'accompagnement se règlent ensuite dans l'onglet Cantine / Garderie.</li>
+            </ul>
+            <p>Après l'ajout, <strong>tout se modifie directement dans le tableau de l'onglet 📋 Liste</strong> : cliquez dans une case, changez la valeur, c'est enregistré. La croix ✕ supprime l'élève.</p>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="onglets" aria-labelledby="t-onglets">
+            <h2 id="t-onglets">5. Les onglets, un par un</h2>
+
+            <h3 id="o-liste">📋 Liste</h3>
+            <p>Le tableau de la classe avec le nombre d'élèves. Cliquez sur un en-tête de colonne (Nom, Prénom, Genre, Naissance, Niveau) pour trier ; un second clic inverse l'ordre. Toutes les cases sont modifiables.</p>
+
+            <h3 id="o-pyramide">📊 Pyramide</h3>
+            <p>Calculée automatiquement à partir des dates de naissance : pyramide par année de naissance (garçons à gauche, filles à droite), répartition par mois de naissance et par niveau. Rien à saisir.</p>
+
+            <h3 id="o-anniv">🎂 Anniversaires</h3>
+            <p>Un calendrier de l'année, mois par mois, avec le jour de l'anniversaire de chaque élève. Pratique à afficher en classe.</p>
+
+            <h3 id="o-groupes">👥 Groupes</h3>
+            <ul>
+                <li><strong>🔀 Régénérer automatiquement</strong> : répartit tous les élèves au hasard dans des groupes de même taille (à un élève près).</li>
+                <li><strong>Glisser-déposer</strong> un élève d'un groupe à l'autre pour ajuster ; ✕ le retire de son groupe.</li>
+                <li><strong>+ Ajouter un groupe</strong> (jusqu'à 14), ✕ sur un groupe pour le supprimer.</li>
+                <li>✎ pour <strong>renommer</strong> un groupe, la pastille de couleur pour <strong>changer sa couleur</strong>.</li>
+            </ul>
+
+            <h3 id="o-cantine">🍽️ Cantine / Garderie</h3>
+            <p>Une fiche par élève :</p>
+            <ul>
+                <li><strong>Cantine</strong> : une fois cochée, options <em>Sans viande</em> et <em>Sans porc</em> ;</li>
+                <li><strong>Garderie</strong> : grille des jours (lundi à vendredi), matin et après-midi ;</li>
+                <li><strong>Allergie</strong> et <strong>remarque</strong> libres ;</li>
+                <li>si l'élève a une <strong>AESH</strong>, la grille de ses demi-journées d'accompagnement.</li>
+            </ul>
+            <p>Ces informations servent ensuite à préremplir les feuilles de cantine et de garderie de l'onglet Pointage.</p>
+
+            <h3 id="o-autres">📝 Autres</h3>
+            <p>Un pense-bête pour les informations pratiques de l'école (codes, horaires, numéros utiles…). Chaque ligne peut recevoir un emoji pour la repérer d'un coup d'œil.</p>
+
+            <h3 id="o-apc">🎯 Suivi APC</h3>
+            <p>Pour chaque séance : la date, le domaine ou l'objectif (ex. « Lecture – fluence »), les élèves présents (cases à cocher) et des notes. L'historique s'affiche de la plus récente à la plus ancienne.</p>
+
+            <h3 id="o-pointage">🖨️ Pointage / exportation PDF</h3>
+            <p>Fabrique des feuilles prêtes à imprimer. Choisissez d'abord le type de liste :</p>
+            <div class="tableWrap">
+                <table class="docTable">
+                    <thead><tr><th>Type</th><th>Contenu</th></tr></thead>
+                    <tbody>
+                        <tr><td>📋 Liste générale</td><td>Tous les élèves avec des colonnes vides à remplir (5 par défaut).</td></tr>
+                        <tr><td>⚡ Liste rapide</td><td>Une liste compacte, en deux exemplaires sur la page.</td></tr>
+                        <tr><td>🍽️ Cantine</td><td>Les élèves inscrits à la cantine, avec régime et allergies.</td></tr>
+                        <tr><td>🌅 Garderie</td><td>Les élèves attendus le jour choisi, matin et soir.</td></tr>
+                        <tr><td>🎯 APC</td><td>Les élèves d'une séance d'APC.</td></tr>
+                        <tr><td>🚌 Sortie / appel</td><td>Une liste d'appel pour une sortie scolaire.</td></tr>
+                        <tr><td>✨ Liste personnalisée</td><td>Vous cochez les colonnes voulues : N°, case Présent, niveau, naissance, genre, cantine, garderie du jour, allergie / PAI, AESH, remarque. Option deux exemplaires et ligne vierge pour titrer les colonnes.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>Réglages communs : date, titre facultatif, affichage des noms (nom + prénom, prénom + nom, prénom seul), tri par nom ou par prénom, séparation par niveau, nombre de lignes vides en fin de liste. Pour les listes à grille : nombre de colonnes à remplir et orientation portrait ou paysage. Ajustez la sélection d'élèves si besoin, puis cliquez sur <strong>« Imprimer / enregistrer en PDF »</strong>.</p>
+
+            <h3 id="o-plan">🗺️ Plan de classe</h3>
+            <p>Le travail se fait en deux étapes ; un mode d'emploi repliable est rappelé en haut de l'onglet.</p>
+            <p><strong>Étape 1 — Aménager la salle</strong></p>
+            <ul>
+                <li>Menu <strong>Disposition</strong> : rangées de tables doubles, îlots de 4, en U ou tables individuelles, calculés pour le nombre d'élèves et tournés vers le tableau. Placez le tableau en haut, en bas, à gauche ou à droite.</li>
+                <li>Déplacez les tables à la souris ou au doigt. Cliquez sur une table pour la redimensionner (poignée en bas à droite, ou Maj + flèches), changer son nombre de places (1 à 4), la pivoter ou la supprimer.</li>
+                <li><strong>+ Mobilier</strong> : bureau, porte, fenêtre, armoire ou élément libre.</li>
+                <li>Enregistrez la salle comme <strong>modèle personnel</strong> pour la réutiliser.</li>
+            </ul>
+            <p><strong>Étape 2 — Placer les élèves</strong> (la salle est alors verrouillée)</p>
+            <ul>
+                <li>Glissez un prénom de la liste sur une place (au doigt : appui long puis glisser), ou touchez l'élève puis la place. Déposer sur un élève déjà assis les échange.</li>
+                <li>× remet l'élève dans la liste ; 📌 l'épingle pour que le tirage automatique ne le déplace pas.</li>
+                <li><strong>✨ Générer</strong> : placement au hasard ou complément du plan, avec mixité filles-garçons, niveaux mélangés ou regroupés, et respect des <strong>Contraintes</strong> (élèves à mettre ensemble ou à séparer). « Voir le bilan » résume le résultat.</li>
+                <li><strong>📺 Vue classe</strong> : plan en plein écran pour le TBI ou le vidéoprojecteur. <strong>👁️ Vue élèves</strong> retourne le plan pour le voir depuis le tableau.</li>
+                <li><strong>Imprimer / exporter</strong> : plan vide ou rempli, en PDF ou en image PNG. <strong>↶ Annuler</strong> (Ctrl+Z) revient en arrière.</li>
+            </ul>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection docCsv" id="csv" aria-labelledby="t-csv">
+            <h2 id="t-csv">6. Importer une liste CSV : format attendu et modèle vierge</h2>
+
+            <div class="docTelechargement">
+                <div>
+                    <strong>📥 Modèle vierge prêt à remplir</strong>
+                    <p>Ouvrez-le avec Excel ou LibreOffice Calc, ajoutez une ligne par élève sous les en-têtes, enregistrez au format CSV, puis importez-le.</p>
+                </div>
+                <a class="primaryButton" href="modele-classe-vierge.csv" download="modele-classe-vierge.csv">Télécharger le modèle CSV <span class="arrow" aria-hidden="true">↓</span></a>
+            </div>
+
+            <h3>Le principe</h3>
+            <ul>
+                <li>Un fichier texte <code>.csv</code>, <strong>une ligne par élève</strong>.</li>
+                <li>La <strong>première ligne contient les en-têtes</strong> (noms des colonnes). L'outil s'en sert pour reconnaître les colonnes : leur <strong>ordre n'a pas d'importance</strong>, les majuscules et les accents non plus.</li>
+                <li>Séparateur : <strong>point-virgule</strong> <code>;</code> (recommandé, c'est celui d'Excel en français) ou virgule <code>,</code>. Il est détecté automatiquement.</li>
+                <li>Encodage : UTF-8 ou celui d'Excel sous Windows ; les accents sont relus correctement dans les deux cas.</li>
+                <li>Les colonnes inconnues sont simplement ignorées : un fichier avec plus de colonnes que nécessaire fonctionne.</li>
+            </ul>
+
+            <h3>Les colonnes</h3>
+            <div class="tableWrap">
+                <table class="docTable">
+                    <thead><tr><th>En-tête conseillé</th><th>Obligatoire ?</th><th>Valeurs acceptées</th><th>Si vide ou absent</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>Nom</code></td><td>Non</td><td>Texte libre.</td><td>Nom vide.</td></tr>
+                        <tr><td><code>Prenom</code></td><td><strong>Oui</strong></td><td>Texte libre. Une ligne sans prénom est ignorée.</td><td>Sans colonne Prénom, rien n'est importé.</td></tr>
+                        <tr><td><code>Genre</code></td><td>Non</td><td><code>F</code>, <code>Fille</code> → fille<br><code>M</code>, <code>G</code>, <code>Garçon</code>, <code>Masculin</code> → garçon</td><td>Fille.</td></tr>
+                        <tr><td><code>DateNaissance</code></td><td>Conseillé</td><td><code>25/03/2018</code> (jj/mm/aaaa)<br>aussi : <code>25.03.2018</code>, <code>25-03-2018</code>, <code>2018-03-25</code></td><td>Date vide : à compléter dans la Liste, sinon pyramide et anniversaires sont faussés.</td></tr>
+                        <tr><td><code>Niveau</code></td><td>Non</td><td><code>PS</code>, <code>MS</code>, <code>GS</code>, <code>CP</code>, <code>CE1</code>, <code>CE2</code>, <code>CM1</code>, <code>CM2</code> (en majuscules), ou tout autre texte (niveau personnalisé).</td><td>CP.</td></tr>
+                        <tr><td><code>PAI</code></td><td>Non</td><td><code>Oui</code>, <code>O</code>, <code>X</code>, <code>1</code>, <code>Vrai</code> → coché ; toute autre valeur → non coché.</td><td>Non coché.</td></tr>
+                        <tr><td><code>AESH</code></td><td>Non</td><td>Comme PAI.</td><td>Non coché.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="docNote">💡 D'autres intitulés sont reconnus : « Sexe » pour le genre, « Date de naissance » ou « DDN » pour la date, « Classe » pour le niveau. Pour éviter toute erreur, utilisez de préférence les en-têtes du modèle.</p>
+
+            <h3>Exemple</h3>
+            <p>Voici ce que contient un fichier correct, ouvert dans un éditeur de texte :</p>
+            <pre class="docCode"><code>Nom;Prenom;Genre;DateNaissance;Niveau;PAI;AESH
+MARTIN;Léa;F;14/02/2018;CP;Non;Non
+DUBOIS;Noah;G;03/11/2017;CE1;Oui;Non
+BERNARD;Inès;F;27/06/2018;CP;;Oui
+PETIT;Lucas;M;09/09/2017;ULIS;Non;Non</code></pre>
+            <p>Le même fichier dans un tableur :</p>
+            <div class="tableWrap">
+                <table class="docTable docTableau">
+                    <thead><tr><th>Nom</th><th>Prenom</th><th>Genre</th><th>DateNaissance</th><th>Niveau</th><th>PAI</th><th>AESH</th></tr></thead>
+                    <tbody>
+                        <tr><td>MARTIN</td><td>Léa</td><td>F</td><td>14/02/2018</td><td>CP</td><td>Non</td><td>Non</td></tr>
+                        <tr><td>DUBOIS</td><td>Noah</td><td>G</td><td>03/11/2017</td><td>CE1</td><td>Oui</td><td>Non</td></tr>
+                        <tr><td>BERNARD</td><td>Inès</td><td>F</td><td>27/06/2018</td><td>CP</td><td></td><td>Oui</td></tr>
+                        <tr><td>PETIT</td><td>Lucas</td><td>M</td><td>09/09/2017</td><td>ULIS</td><td>Non</td><td>Non</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Remplir le modèle avec un tableur</h3>
+            <ol class="etapes">
+                <li>Téléchargez le <a href="modele-classe-vierge.csv" download="modele-classe-vierge.csv">modèle vierge</a> et ouvrez-le avec Excel ou LibreOffice Calc. <small>(LibreOffice affiche d'abord une fenêtre d'import : cochez « Point-virgule » comme séparateur.)</small></li>
+                <li>Ne modifiez pas la première ligne. Remplissez une ligne par élève à partir de la ligne 2.</li>
+                <li>Pour les dates, tapez-les au format <code>jj/mm/aaaa</code>. Le tableur peut les afficher autrement : ce n'est pas grave tant qu'il enregistre une date.</li>
+                <li>Enregistrez en gardant le format CSV :
+                    <ul>
+                        <li><strong>Excel</strong> : Fichier → Enregistrer sous → type <em>CSV UTF-8 (délimité par des virgules)</em> ou <em>CSV (séparateur : point-virgule)</em>. Si Excel avertit que certaines fonctionnalités seront perdues, répondez « Oui / Conserver ce format ».</li>
+                        <li><strong>LibreOffice Calc</strong> : Fichier → Enregistrer sous → type <em>Texte CSV (.csv)</em> → « Utiliser le format Texte CSV » → jeu de caractères <em>Unicode (UTF-8)</em>, séparateur <code>;</code>.</li>
+                    </ul>
+                </li>
+                <li>Dans l'outil : <em>📄 Import / export CSV → 📥 Importer une liste CSV</em>, puis choisissez le fichier.</li>
+            </ol>
+
+            <h3>Depuis ONDE</h3>
+            <p>L'extraction ONDE « Liste simple des élèves par classe » au format CSV est prévue pour être importée telle quelle : les colonnes de nom, prénom, sexe, date de naissance et niveau sont reconnues d'après leurs intitulés, les autres sont ignorées. Contrôlez toujours le résultat dans l'onglet 📋 Liste ; si une colonne est mal reconnue, renommez son en-tête comme dans le modèle (<code>Nom</code>, <code>Prenom</code>, <code>Genre</code>, <code>DateNaissance</code>, <code>Niveau</code>).</p>
+
+            <h3>Bon à savoir</h3>
+            <ul>
+                <li>L'import <strong>ajoute</strong> les élèves à ceux déjà présents. Pour repartir de zéro, faites d'abord « Tout effacer » (après avoir enregistré si besoin). Réimporter deux fois le même fichier crée des doublons.</li>
+                <li>Le CSV ne contient que la liste. Cantine, garderie, groupes, plan, APC… se renseignent dans l'outil et se conservent avec la sauvegarde JSON.</li>
+                <li>L'export CSV de l'outil produit exactement ce format : un fichier exporté peut être réimporté, ou complété dans un tableur puis réimporté.</li>
+            </ul>
+
+            <h3>Si l'import ne fonctionne pas</h3>
+            <div class="tableWrap">
+                <table class="docTable">
+                    <thead><tr><th>Symptôme</th><th>Cause probable et solution</th></tr></thead>
+                    <tbody>
+                        <tr><td>Aucun élève importé</td><td>Pas de colonne « Prénom » dans la première ligne, ou fichier enregistré en <code>.xlsx</code> au lieu de <code>.csv</code>. Repartez du modèle.</td></tr>
+                        <tr><td>Toute la ligne se retrouve dans le prénom</td><td>Le séparateur n'est ni <code>;</code> ni <code>,</code> (par exemple une tabulation). Réenregistrez en CSV point-virgule.</td></tr>
+                        <tr><td>Dates vides après l'import</td><td>Format non reconnu (ex. « 14 février 2018 »). Utilisez <code>jj/mm/aaaa</code>.</td></tr>
+                        <tr><td>Prénom et nom inversés</td><td>En-têtes ambigus. Utilisez exactement <code>Nom</code> et <code>Prenom</code>.</td></tr>
+                        <tr><td>Tous les élèves en CP</td><td>Colonne Niveau absente ou vide. Corrigez dans la Liste ou ajoutez la colonne.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="impression" aria-labelledby="t-impression">
+            <h2 id="t-impression">7. Imprimer et exporter en PDF</h2>
+            <ul>
+                <li><strong>📄 Exporter cet onglet en PDF</strong> (au-dessus de chaque onglet) imprime l'onglet affiché.</li>
+                <li><strong>🖨️ Imprimer</strong> (barre d'outils) regroupe plusieurs sections, chacune sur une nouvelle page.</li>
+                <li>Pour obtenir un PDF, choisissez <strong>« Enregistrer au format PDF »</strong> comme imprimante dans la fenêtre d'impression du navigateur.</li>
+                <li>Le plan de classe peut aussi être exporté en image <strong>PNG</strong>.</li>
+            </ul>
+            <p class="docNote">💡 Si la mise en page déborde, essayez l'orientation paysage dans l'onglet Pointage, ou réduisez l'échelle dans la fenêtre d'impression.</p>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="affichage" aria-labelledby="t-affichage">
+            <h2 id="t-affichage">8. Affichage et accessibilité</h2>
+            <ul>
+                <li>Le bouton 🌙 / ☀️ en haut à droite bascule entre mode clair et mode sombre.</li>
+                <li>Les réglages du portail Apps1D76 (contraste renforcé, taille du texte, animations réduites) s'appliquent aussi à cet outil.</li>
+                <li>L'outil fonctionne sur ordinateur, tablette et téléphone ; le plan de classe est plus confortable sur grand écran.</li>
+            </ul>
+        </section>
+
+        <!-- ================================================================== -->
+        <section class="card docSection" id="faq" aria-labelledby="t-faq">
+            <h2 id="t-faq">9. Questions fréquentes</h2>
+            <details><summary>J'ai changé d'ordinateur et ma classe a disparu.</summary><p>Les données restent dans le navigateur où elles ont été saisies. Sur le nouvel ordinateur, utilisez <em>💾 Sauvegarde → Reprendre une classe (JSON)</em> avec votre fichier de sauvegarde.</p></details>
+            <details><summary>Puis-je travailler à plusieurs sur la même classe ?</summary><p>Pas en simultané. Partagez le fichier JSON : chaque personne le recharge, travaille, puis réenregistre. Attention à toujours repartir du fichier le plus récent.</p></details>
+            <details><summary>Comment remettre la classe à zéro en septembre ?</summary><p>Enregistrez l'ancienne classe (JSON) pour archive, cliquez sur « Tout effacer », puis importez la nouvelle liste CSV.</p></details>
+            <details><summary>Un élève arrive en cours d'année.</summary><p>Ajoutez-le avec le formulaire « Ajouter un élève ». Il apparaît dans tous les onglets ; placez-le ensuite dans un groupe et sur le plan de classe.</p></details>
+            <details><summary>Les données sont-elles envoyées quelque part ?</summary><p>Non. Aucune donnée n'est transmise : tout est traité et conservé dans votre navigateur.</p></details>
+        </section>
+
+        <p class="docRetour"><a class="softButton" href="index.html">← Retour à Ma Classe en Boîte</a> <a class="softButton" href="#titreSommaire">↑ Haut de page</a></p>
+    </main>
+
+    <footer class="footer">Académie de Normandie · Seine-Maritime (76) · Mission Numérique Éducatif 76 — développé par Etienne Liaudet</footer>
+</body>
+</html>

@@ -19,6 +19,7 @@
                 <span><b>Apps1D<span>76</span></b><small>Mission Numérique Éducatif 76</small></span>
             </a>
             <div class="actions">
+                <a class="docBtn" href="aide.html" target="_blank" rel="noopener" title="Documentation complète (nouvel onglet)"><span aria-hidden="true">📖</span><span class="docBtnTexte">Mode d'emploi</span></a>
                 <button type="button" class="icon-btn" id="btnAide" aria-label="Aide et à propos" title="Aide et à propos">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.5-2.7 4"/><path d="M12 17.5h.01"/></svg>
                 </button>
@@ -43,6 +44,8 @@
                 <div class="dropdownMenu" id="menuCsv" hidden>
                     <button type="button" id="btnImportCsv">📥 Importer une liste CSV (ONDE)</button>
                     <button type="button" id="btnExportCsv">📤 Exporter la liste en CSV</button>
+                    <a href="modele-classe-vierge.csv" download="modele-classe-vierge.csv">📝 Télécharger un modèle CSV vierge</a>
+                    <a href="aide.html#csv" target="_blank" rel="noopener">❔ Format CSV attendu</a>
                 </div>
                 <input type="file" id="fileImportCsv" accept=".csv" hidden>
             </div>

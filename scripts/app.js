@@ -3186,6 +3186,7 @@
             var ajouts = importerCSV(texte);
             $('fileImportCsv').value = '';
             if (ajouts > 0) { sauvegarder(); render(); }
+            else showConfirm('Aucun élève importé', 'Le fichier doit contenir une première ligne d\'en-têtes avec au moins une colonne « Prénom », puis une ligne par élève. Consultez le mode d\'emploi (rubrique « Importer une liste CSV ») et son modèle vierge.', function () {}, { libelleConfirmer: 'OK', bleu: true });
         };
         lecteur.readAsArrayBuffer(fichier);
     });
@@ -3333,6 +3334,7 @@
         ouvrirModale(
             '    <h3>🎓 Aide — Ma Classe en Boîte</h3>' +
             '    <div class="corpsAide">' +
+            '      <p><a href="aide.html" target="_blank" rel="noopener">📖 Ouvrir le mode d\'emploi complet</a> (fonctionnalités détaillées, format du fichier CSV et modèle vierge à télécharger).</p>' +
             '      <h4>📋 Liste</h4><p>Ajoutez vos élèves via le formulaire en haut de page. Modifiez n\'importe quel champ directement dans le tableau, triez en cliquant sur l\'en-tête d\'une colonne.</p>' +
             '      <h4>📊 Pyramide &amp; 🎂 Anniversaires</h4><p>Générées automatiquement à partir des dates de naissance de la liste, rien à saisir.</p>' +
             '      <h4>👥 Groupes</h4><p>Régénérez des groupes équilibrés en un clic, ou glissez-déposez les élèves à la main. Renommez un groupe (icône crayon) et changez sa couleur (pastille), ajoutez ou supprimez des groupes librement.</p>' +
@@ -3343,7 +3345,7 @@
             '      <h4>🗺️ Plan de classe</h4><p>Un mode d\'emploi repliable est affiché en haut de l\'onglet. <strong>Étape 1 — Aménager la salle</strong> : le menu « Disposition » propose des dispositions types (calculées pour le nombre d\'élèves et tournées vers le tableau), place le tableau (haut, bas, gauche, droite), range les tables presque alignées et enregistre la salle comme modèle personnel réutilisable. Déplacez les tables à la souris ou au doigt ; cliquez sur une table pour la redimensionner (poignée en bas à droite, ou Maj + flèches), changer son nombre de places (1 à 4), la pivoter ou la supprimer. « + Mobilier » ajoute bureau, porte, fenêtre, armoire ou un élément à nommer. <strong>Étape 2 — Placer les élèves</strong> (la salle est alors verrouillée) : glissez un prénom de la liste sur une place (au doigt : appui long puis glisser), ou touchez l\'élève puis la place. Déposer sur un élève assis les échange ; × le remet dans la liste ; 📌 l\'épingle pour que le tirage ne le déplace pas. « ✨ Générer » : tout au hasard (sauf les élèves épinglés) ou compléter le plan, avec les réglages mixité fille-garçon, niveaux de classe (mélanger ou regrouper), priorité à « À mettre avec », « À séparer de » (pas à la même table ou éloigner) et remplissage ; « Voir le bilan » résume le plan. « Contraintes » : paires d\'élèves à séparer ou à mettre ensemble. « 🎨 Couleurs » personnalise les couleurs filles / garçons. « 📺 Vue classe » affiche le plan en plein écran pour la projection (prénoms ou noms complets, numéros de table, vue élèves ou enseignant). « Imprimer / exporter » : plan vide ou rempli, numéros de table, vue enseignant ou élèves, en PDF (fenêtre d\'impression) ou en image PNG. « ↶ Annuler » (Ctrl+Z) revient en arrière à tout moment.</p>' +
             '      <h4>Import / export</h4>' +
             '      <ul>' +
-            '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter.</li>' +
+            '        <li><strong>CSV</strong> : compatible avec un export ONDE (« Liste simple des élèves par classe ») pour importer une classe, ou avec Excel pour exporter. Colonnes attendues : Nom ; Prenom ; Genre ; DateNaissance ; Niveau ; PAI ; AESH — <a href="aide.html#csv" target="_blank" rel="noopener">voir le format détaillé</a>.</li>' +
             '        <li><strong>JSON</strong> : sauvegarde complète et fidèle de tout l\'outil (élèves, groupes, notes, APC…), pour reprendre le travail plus tard, y compris sur un autre appareil.</li>' +
             '      </ul>' +
             '      <h4>🖨️ Imprimer / PDF</h4><p>Le bouton « Exporter cet onglet en PDF » (au-dessus de chaque onglet) imprime l\'onglet affiché : choisissez « Enregistrer au format PDF » dans la fenêtre d\'impression. Le bouton « Imprimer » en haut de page permet de regrouper plusieurs sections, chacune sur une nouvelle page.</p>' +
