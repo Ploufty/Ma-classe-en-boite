@@ -1483,6 +1483,7 @@
 
     var PLAN_LARGEUR = 1000;
     var PLAN_HAUTEUR_MIN = 640;
+    var PLAN_HAUTEUR_MAX = 5000;               // borne des valeurs importées (un fichier modifié à la main peut contenir 1e400)
     var PLAN_PAS = 10;                          // aimantation des déplacements et redimensionnements
     var LARGEUR_PLACE = 90, HAUTEUR_TABLE = 58;
     var MAX_PLACES_TABLE = 4;
@@ -1515,6 +1516,12 @@
         };
     }
 
+    // Nombre fini ramené dans [min, max] (min si la valeur n'est pas un nombre).
+    function borne(v, min, max) {
+        v = Number(v);
+        return isFinite(v) ? Math.min(max, Math.max(min, v)) : min;
+    }
+
     function tailleParDefaut(type, places) {
         return type === 'table' ? { w: LARGEUR_PLACE * places, h: HAUTEUR_TABLE } : { w: MOBILIER[type].w, h: MOBILIER[type].h };
     }
@@ -1536,7 +1543,7 @@
         var defaut = nouveauPlan();
         p = p && typeof p === 'object' ? p : {};
         var plan = reglagesValides(defaut, p);
-        plan.hauteur = Math.max(PLAN_HAUTEUR_MIN, Number(plan.hauteur) || 0);
+        plan.hauteur = borne(plan.hauteur, PLAN_HAUTEUR_MIN, PLAN_HAUTEUR_MAX);
         plan.couleurs = reglagesValides(defaut.couleurs, p.couleurs);
         ['F', 'M'].forEach(function (g) { if (!REGEX_COULEUR.test(plan.couleurs[g])) plan.couleurs[g] = COULEURS_DEFAUT[g]; });
         plan.export = reglagesValides(defaut.export, p.export);
@@ -1551,9 +1558,13 @@
         if (!COTES_TABLEAU[plan.tableau]) plan.tableau = 'haut';
         if (['indifferent', 'melanger', 'regrouper'].indexOf(plan.niveaux) === -1) plan.niveaux = 'indifferent';
         if (plan.separation !== 'eloigner') plan.separation = 'table';
+        if (plan.mode !== 'placer') plan.mode = 'amenager';
+        if (plan.affichage !== 'prenomNom') plan.affichage = 'prenom';
+        if (plan.remplissage !== 'reparti') plan.remplissage = 'devant';
+        if (plan.vueClasse.affichage !== 'prenomNom') plan.vueClasse.affichage = 'prenom';
         plan.tables = normaliserElements(plan.tables);
         plan.modeles = (Array.isArray(plan.modeles) ? plan.modeles : []).filter(function (m) { return m && m.id; }).map(function (m) {
-            return { id: idValide(m.id) ? m.id : uid(), nom: chaine(m.nom) || 'Salle', hauteur: Math.max(PLAN_HAUTEUR_MIN, Number(m.hauteur) || 0),
+            return { id: idValide(m.id) ? m.id : uid(), nom: chaine(m.nom) || 'Salle', hauteur: borne(m.hauteur, PLAN_HAUTEUR_MIN, PLAN_HAUTEUR_MAX),
                 tableau: COTES_TABLEAU[m.tableau] ? m.tableau : 'haut', tables: normaliserElements(m.tables) };
         });
         return plan;
@@ -1564,7 +1575,7 @@
         liste.forEach(function (t) {
             if (!idValide(t.id)) t.id = uid();
             t.label = chaine(t.label);
-            ['x', 'y', 'w', 'h'].forEach(function (k) { t[k] = Number(t[k]) || 0; });
+            ['x', 'y', 'w', 'h'].forEach(function (k) { t[k] = borne(t[k], 0, k === 'x' || k === 'w' ? PLAN_LARGEUR : PLAN_HAUTEUR_MAX); });
             if (!t.type) t.type = t.bureau ? 'bureau' : 'table';   // plans enregistrés avant l'ajout du mobilier
             if (t.type !== 'table' && !MOBILIER[t.type]) t.type = 'divers';
             t.places = t.type === 'table' ? Math.max(1, Math.min(MAX_PLACES_TABLE, parseInt(t.places, 10) || 1)) : 0;
@@ -1577,6 +1588,7 @@
                 t.w = t.vertical ? d.h : d.w;
                 t.h = t.vertical ? d.w : d.h;
             }
+            t.x = Math.max(0, Math.min(t.x, PLAN_LARGEUR - t.w));
             delete t.vertical;
             delete t.bureau;
         });
@@ -1921,7 +1933,8 @@
         });
 
         // 2) Les autres élèves, place par place. Chaque candidat reçoit une pénalité : « À séparer de » (forte),
-        //    niveaux de classe (moyenne), alternance filles / garçons (faible). Le premier meilleur candidat l'emporte.
+        //    niveaux de classe (moyenne), alternance filles / garçons (faible) ; un bonus rapproche les élèves
+        //    « À mettre avec » (après les niveaux, avant la mixité). Le premier meilleur candidat l'emporte.
         var p = state.plan;
         ordreSieges().forEach(function (s) {
             if (s.table.eleves[s.index] || !aPlacer.length) return;
@@ -1934,6 +1947,7 @@
                 var score = conflitTable(el.id, s.table) ? 100 : 0;
                 if (p.niveaux !== 'indifferent' && voisin && (el.niveau === voisin.niveau) === (p.niveaux === 'melanger')) score += 10;
                 if (p.mixte && (voisin || p.niveaux !== 'regrouper') && (el.genre === 'M') !== garconVoulu) score += 1;
+                if (partenaires(el.id, 'ensemble').some(function (id) { return s.table.eleves.indexOf(id) !== -1; })) score -= 5;
                 if (score < meilleur) { meilleur = score; choix = el; }
             });
             s.table.eleves[s.index] = choix.id;
@@ -2601,10 +2615,12 @@
                 e.preventDefault();
                 memoriserPlan();
                 if (e.shiftKey) {
-                    var lim = limitesTaille(t);
-                    t.w = Math.max(lim.court, Math.min(PLAN_LARGEUR - t.x, t.w + fleche[0] * PLAN_PAS));
-                    t.h = Math.max(lim.court, t.h + fleche[1] * PLAN_PAS);
+                    // En vue élèves, comme avec la poignée, le coin opposé (bas droite des données) reste fixe.
+                    var lim = limitesTaille(t), vue = state.plan.vueEleves, x2 = t.x + t.w, y2 = t.y + t.h;
+                    t.w = Math.max(lim.court, Math.min(vue ? x2 : PLAN_LARGEUR - t.x, t.w + fleche[0] * PLAN_PAS));
+                    t.h = Math.max(lim.court, Math.min(vue ? y2 : Infinity, t.h + fleche[1] * PLAN_PAS));
                     if (Math.max(t.w, t.h) < lim.long) { if (t.w >= t.h) t.w = lim.long; else t.h = lim.long; }
+                    if (vue) { t.x = Math.max(0, x2 - t.w); t.y = Math.max(0, y2 - t.h); }
                 } else {
                     t.x = Math.max(0, Math.min(PLAN_LARGEUR - t.w, t.x + fleche[0] * PLAN_PAS * sens));
                     t.y = Math.max(0, t.y + fleche[1] * PLAN_PAS * sens);
