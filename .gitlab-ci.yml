@@ -1,0 +1,11 @@
+# Publie l'application (statique, sans étape de compilation) sur GitLab Pages.
+pages:
+  stage: deploy
+  script:
+    - mkdir public
+    - cp -r index.html css scripts public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
