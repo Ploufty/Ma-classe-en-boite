@@ -755,8 +755,7 @@ body.glisseEnCours, body.glisseEnCours * { cursor: grabbing !important; }
 .planTable.type-fenetre { background: #cfe6f7; border-color: #6c9cc0; }
 .planTable.type-porte { background: #e3cfb5; border-color: #8a6e46; }
 [data-theme="dark"] .planTable.meuble { background: #4a5261; border-color: #7a8699; }
-.planMeubleLabel { padding: 0 .3cqw; font-weight: 700; font-size: clamp(8px, 1.2cqw, 14px); color: #1e1e2f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-[data-theme="dark"] .planMeubleLabel { color: #eeeef6; }
+.planMeubleLabel { padding: 0 .3cqw; font-weight: 700; font-size: clamp(8px, 1.2cqw, 14px); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Étape 1 : tables déplaçables, boutons et poignée visibles sur la table sélectionnée ou survolée */
 .mode-amenager .planTable { cursor: grab; touch-action: none; }

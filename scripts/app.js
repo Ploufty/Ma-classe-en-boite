@@ -806,12 +806,7 @@
     function genererGroupesEquilibres() {
         var nb = state.nbGroupes;
         // Mélange aléatoire puis répartition tournante : donne des groupes de taille égale (à un près).
-        var melange = state.eleves.slice();
-        for (var i = melange.length - 1; i > 0; i--) {
-            var j = Math.floor(Math.random() * (i + 1));
-            var tmp = melange[i]; melange[i] = melange[j]; melange[j] = tmp;
-        }
-        melange.forEach(function (el, i) {
+        melanger(state.eleves).forEach(function (el, i) {
             el.groupe = (i % nb) + 1;
         });
         sauvegarder();
@@ -1546,13 +1541,11 @@
         plan.contraintes = (Array.isArray(p.contraintes) ? p.contraintes : []).filter(function (c) {
             return c && idValide(c.a) && idValide(c.b) && (c.type === 'separer' || c.type === 'ensemble');
         }).map(function (c) { return { a: c.a, b: c.b, type: c.type }; });
-        plan.tables = p.tables;
-        plan.modeles = p.modeles;
         if (!COTES_TABLEAU[plan.tableau]) plan.tableau = 'haut';
         if (['indifferent', 'melanger', 'regrouper'].indexOf(plan.niveaux) === -1) plan.niveaux = 'indifferent';
         if (plan.separation !== 'eloigner') plan.separation = 'table';
-        plan.tables = normaliserElements(plan.tables);
-        plan.modeles = (Array.isArray(plan.modeles) ? plan.modeles : []).filter(function (m) { return m && m.id; }).map(function (m) {
+        plan.tables = normaliserElements(p.tables);
+        plan.modeles = (Array.isArray(p.modeles) ? p.modeles : []).filter(function (m) { return m && m.id; }).map(function (m) {
             return { id: idValide(m.id) ? m.id : uid(), nom: chaine(m.nom) || 'Salle', hauteur: Math.max(PLAN_HAUTEUR_MIN, Number(m.hauteur) || 0),
                 tableau: COTES_TABLEAU[m.tableau] ? m.tableau : 'haut', tables: normaliserElements(m.tables) };
         });
@@ -2017,8 +2010,8 @@
     var tableActive = null;     // table sélectionnée à l'étape 1 (poignée et boutons visibles)
     var pilePlan = [];          // historique pour « Annuler »
 
-    function memoriserPlan() {
-        pilePlan.push(JSON.stringify(state.plan));
+    function memoriserPlan(instantane) {
+        pilePlan.push(instantane || JSON.stringify(state.plan));
         if (pilePlan.length > 40) pilePlan.shift();
     }
 
@@ -2572,8 +2565,7 @@
             drag = null;
             d.el.classList.remove('deplacement');
             if (d.bouge) {
-                pilePlan.push(d.avant);
-                if (pilePlan.length > 40) pilePlan.shift();
+                memoriserPlan(d.avant);
                 ajusterHauteurPlan();
                 sauvegarder();
             }
