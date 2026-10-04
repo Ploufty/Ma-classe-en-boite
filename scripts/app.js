@@ -113,11 +113,11 @@
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    function telecharger(contenu, type, extension) {
+    function telecharger(contenu, type, extension, nomBase) {
         var url = URL.createObjectURL(new Blob([contenu], { type: type }));
         var lien = document.createElement('a');
         lien.href = url;
-        lien.download = 'classe_' + new Date().toISOString().slice(0, 10) + '.' + extension;
+        lien.download = (nomBase || 'classe') + '_' + new Date().toISOString().slice(0, 10) + '.' + extension;
         document.body.appendChild(lien);
         lien.click();
         document.body.removeChild(lien);
@@ -1576,10 +1576,12 @@
         return liste;
     }
 
+    function placesVides(n) { return new Array(n).fill(null); }
+
     function nouvelleTable(x, y, places, vertical) {
         var d = tailleParDefaut('table', places);
         return { id: uid(), type: 'table', x: x, y: y, w: vertical ? d.h : d.w, h: vertical ? d.w : d.h, places: places,
-            eleves: Array.from({ length: places }, function () { return null; }) };
+            eleves: placesVides(places) };
     }
 
     function nouveauMeuble(type, label) {
@@ -1590,6 +1592,13 @@
     function nomMeuble(t) { return MOBILIER[t.type].icone + ' ' + (t.label || MOBILIER[t.type].label); }
 
     // Côté court minimal et côté long minimal (qui dépend du nombre de places).
+    // Applique les minimums : côté court et, pour au moins un côté, côté long.
+    function bornerTaille(lim, w, h) {
+        w = Math.max(lim.court, w); h = Math.max(lim.court, h);
+        if (Math.max(w, h) < lim.long) { if (w >= h) w = lim.long; else h = lim.long; }
+        return { w: w, h: h };
+    }
+
     function limitesTaille(t) {
         return t.type === 'table' ? { court: EPAISSEUR_MIN, long: PLACE_MIN * t.places } : { court: 14, long: 20 };
     }
@@ -1736,7 +1745,7 @@
     // ----- Modèles personnels : salles enregistrées (sans les élèves) pour être réutilisées -----
 
     function copieSansEleves(t, nouvelId) {
-        return Object.assign({}, t, { id: nouvelId ? uid() : t.id, eleves: Array.from({ length: t.places }, function () { return null; }) });
+        return Object.assign({}, t, { id: nouvelId ? uid() : t.id, eleves: placesVides(t.places) });
     }
 
     function enregistrerModele() {
@@ -2546,8 +2555,7 @@
             if (drag.taille) {
                 // La poignée est en bas à droite de ce qui est affiché : en vue élèves, cela correspond au coin haut gauche.
                 var lim = limitesTaille(t);
-                var w = Math.max(lim.court, aimante(drag.w + dx)), h = Math.max(lim.court, aimante(drag.h + dy));
-                if (Math.max(w, h) < lim.long) { if (w >= h) w = lim.long; else h = lim.long; }
+                var dim = bornerTaille(lim, aimante(drag.w + dx), aimante(drag.h + dy)), w = dim.w, h = dim.h;
                 t.w = Math.min(w, vue ? drag.x + drag.w : PLAN_LARGEUR - drag.x);
                 t.h = Math.min(h, vue ? drag.y + drag.h : H - drag.y);
                 if (vue) { t.x = drag.x + drag.w - t.w; t.y = drag.y + drag.h - t.h; }
@@ -2594,9 +2602,8 @@
                 memoriserPlan();
                 if (e.shiftKey) {
                     var lim = limitesTaille(t);
-                    t.w = Math.max(lim.court, Math.min(PLAN_LARGEUR - t.x, t.w + fleche[0] * PLAN_PAS));
-                    t.h = Math.max(lim.court, t.h + fleche[1] * PLAN_PAS);
-                    if (Math.max(t.w, t.h) < lim.long) { if (t.w >= t.h) t.w = lim.long; else t.h = lim.long; }
+                    var dim = bornerTaille(lim, Math.min(PLAN_LARGEUR - t.x, t.w + fleche[0] * PLAN_PAS), t.h + fleche[1] * PLAN_PAS);
+                    t.w = dim.w; t.h = dim.h;
                 } else {
                     t.x = Math.max(0, Math.min(PLAN_LARGEUR - t.w, t.x + fleche[0] * PLAN_PAS * sens));
                     t.y = Math.max(0, t.y + fleche[1] * PLAN_PAS * sens);
@@ -3029,15 +3036,7 @@
                 }
             });
 
-            canvas.toBlob(function (blob) {
-                var url = URL.createObjectURL(blob), lien = document.createElement('a');
-                lien.href = url;
-                lien.download = 'plan-de-classe_' + aujourdHuiISO() + '.png';
-                document.body.appendChild(lien);
-                lien.click();
-                lien.remove();
-                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-            }, 'image/png');
+            canvas.toBlob(function (blob) { telecharger(blob, 'image/png', 'png', 'plan-de-classe'); }, 'image/png');
         };
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(dessiner); else dessiner();
     }
